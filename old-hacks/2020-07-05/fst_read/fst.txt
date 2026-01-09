@@ -1,0 +1,15 @@
+unknown 0-8
+0xc = number of fst entries
+
+
+
+fst entry size 0xC
+start at 0x10
+
+u32 offset into string table of file to replace (if directory, set directory level to this value)
+u32 offset into file of what to replace with
+
+
+
+
+0 = file replace?

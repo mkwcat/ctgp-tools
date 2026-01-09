@@ -1,0 +1,115 @@
+#include "dif.h"
+#include <bsd_string.h>
+#include <string.h>
+
+u8* dia_data;
+int dia_size;
+
+FILE* outfile;
+
+int main(int argc, char** argv)
+{
+    char* pack_name = (char*)malloc(8);
+    char* rmc_name = (char*)"RMC";
+    char* dia_name = (char*)"magic.dif";
+
+    int pack_set = 0;
+    int rmc_set = 0;
+    int dia_set = 0;
+
+    if (argc % 2 == 0)
+    {
+        printf("usage: %s [--pack <pack>] [--rmc <rmc>] [--dia <dia>]\n",
+               argv[0]);
+        return 1;
+    }
+
+    int i = 1;
+    while (i < argc)
+    {
+        if (!strncmp(argv[i], "--pack", 7) && !pack_set)
+        {
+            pack_name = argv[i + 1];
+            pack_set = 1;
+        }
+        else if (!strncmp(argv[i], "--rmc", 6) && !rmc_set)
+        {
+            rmc_name = argv[i + 1];
+            rmc_set = 1;
+        }
+        else if (!strncmp(argv[i], "--dia", 6) && !dia_set)
+        {
+            dia_name = argv[i + 1];
+            dia_set = 1;
+        }
+        else
+        {
+            printf("usage: %s [--pack <pack>] [--rmc <rmc>] [--dia <dia>]\n",
+                   argv[0]);
+            return 1;
+        }
+
+        i += 2;
+    }
+
+    FILE* dia_file = fopen(dia_name, "rb");
+    if (!dia_file)
+    {
+        printf("failed to open DIA file (%s)!!\n", dia_name);
+        return 1;
+    }
+
+    fseek(dia_file, 0, SEEK_END);
+    dia_size = ftell(dia_file);
+    dia_data = (u8*)malloc(dia_size);
+    assert(dia_data);
+    fseek(dia_file, 0, SEEK_SET);
+    fread(dia_data, 1, dia_size, dia_file);
+    fclose(dia_file);
+
+    if (!pack_set)
+        pack_name = (char*)&((DIA_Header*)dia_data)->package;
+
+    DIA_Diftab_Entry* entries = (DIA_Diftab_Entry*)&dia_data[bswap32(
+        ((DIA_Header*)dia_data)->diftab_entry_offset)];
+    u32 entry_count = bswap32(((DIA_Header*)dia_data)->diftab_entry_count);
+
+    for (u32 i = 0; i < 1; ++i)
+    {
+        u32 infilesize = bswap32(entries[i].size);
+        u8* indata = (u8*)malloc(infilesize);
+        memcpy((void*)indata, &dia_data[bswap32(entries[i].offset)],
+               infilesize);
+
+        printf("updating file #%u (%s):\n", i + 1,
+               &indata[bswap32(((DIF_Header*)indata)->name_offset)]);
+
+        if (int err = OpenExpFiles(pack_name, rmc_name, indata, infilesize))
+        {
+            printf("  failed to open expanded file %X!!\n", err);
+            return 1;
+        }
+
+        char* out_name = (char*)malloc(65536);
+        strlcpy(out_name, pack_name, 65536);
+        strlcat(
+            out_name,
+            (const char*)&indata[bswap32(((DIF_Header*)indata)->name_offset)],
+            65536);
+
+        outfile = fopen(out_name, "wb");
+        if (!outfile)
+        {
+            printf("  failed to open output file (%s)!!\n", out_name);
+            return 1;
+        }
+        printf("  opened output file!\n");
+
+        ProcessDif(indata, infilesize, outfile);
+        fclose(outfile);
+
+        printf("  done!\n");
+    }
+
+    return 0;
+}

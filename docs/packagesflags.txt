@@ -1,0 +1,6 @@
+FLAGS:
+0x80000000 Package directory exists?
+0x04000000 SDA
+0x02000000 EFS (blob.bin or jelly.bin)
+0x01000000 jelly.bin
+

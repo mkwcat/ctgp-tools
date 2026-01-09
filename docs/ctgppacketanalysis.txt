@@ -1,0 +1,11 @@
+0x00 u32 magic; // Always "CTG0"
+0x04 u32 chanVer; // Channel version (for example 00040002)
+0x08 u16 unknown_0x8; // 0x000B in my packet
+0x0A u8 macAddr[6];
+0x10 u8 bootData[0x80]; // Copied from 0x80001000
+0x90
+
+response packet:
+0x00 u8 wholeBunchOfStuff[0x34]; // Whole bunch of stuff I don't get and probably don't need to?
+0x34 u8 packagesSha1[0x14]; // SHA-1 hash of the packages from the last packet
+0x48 u8 moreStuff[0xA]; // More stuff I don't understand

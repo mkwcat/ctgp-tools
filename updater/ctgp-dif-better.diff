@@ -1,0 +1,624 @@
+diff --git a/ctgp-dif/dia.cpp b/ctgp-dif-better/dia.cpp
+index 3ee452e..80f6e6f 100755
+--- a/ctgp-dif/dia.cpp
++++ b/ctgp-dif-better/dia.cpp
+@@ -1,5 +1,5 @@
+ #include "dif.h"
+-#include <direct.h>
++#include <sys/stat.h>
+ #include <string.h>
+ 
+ u8* dia_data;
+@@ -9,13 +9,14 @@ FILE* outfile;
+ 
+ int main(int argc, char** argv)
+ {
+-    char* pack_name = (char*)malloc(8);
++    char* pack_name;
+     char* rmc_name = (char*)"RMC";
+     char* dia_name = (char*)"magic.dif";
+ 
+     int pack_set = 0;
+     int rmc_set = 0;
+     int dia_set = 0;
++    int skip_count = 0;
+ 
+     if (argc % 2 == 0)
+     {
+@@ -42,6 +43,10 @@ int main(int argc, char** argv)
+             dia_name = argv[i + 1];
+             dia_set = 1;
+         }
++        else if (!strncmp(argv[i], "--skip", 7) && !skip_count)
++        {
++            sscanf(argv[i + 1], "%u", &skip_count);
++        }
+         else
+         {
+             printf("usage: %s [--pack <pack>] [--rmc <rmc>] [--dia <dia>]\n",
+@@ -67,6 +72,8 @@ int main(int argc, char** argv)
+     fread(dia_data, 1, dia_size, dia_file);
+     fclose(dia_file);
+ 
++    yaz = (Yaz_file_struct*)malloc(sizeof(*yaz));
++
+     if (!pack_set)
+         pack_name = (char*)&((DIA_Header*)dia_data)->package;
+ 
+@@ -74,7 +81,7 @@ int main(int argc, char** argv)
+         ((DIA_Header*)dia_data)->diftab_entry_offset)];
+     u32 entry_count = bswap32(((DIA_Header*)dia_data)->diftab_entry_count);
+ 
+-    for (u32 i = 0; i < entry_count; ++i)
++    for (u32 i = skip_count; i < entry_count; ++i)
+     {
+         u32 infilesize = bswap32(entries[i].size);
+         u8* indata = (u8*)malloc(infilesize);
+@@ -88,21 +95,23 @@ int main(int argc, char** argv)
+         {
+             printf("  failed to open expanded file %X!!\n", err);
+             CloseExpFiles();
++            free(indata);
+             continue;
+         }
+ 
+-        mkdir(pack_name);
++        mkdir(pack_name, 07777);
+ 
+         char out_name[256];
+         snprintf(
+-            out_name, 256, "./%s%s", pack_name,
++            out_name, 256, "./%.8s%s", pack_name,
+             (const char*)&indata[bswap32(((DIF_Header*)indata)->name_offset)]);
+ 
+         if (out_name[strlen(out_name) - 1] == '/')
+         {
+             out_name[strlen(out_name) - 1] = 0;
+             printf("  creating directory (%s)\n", out_name);
+-            mkdir(out_name);
++            mkdir(out_name, 07777);
++            free(indata);
+         }
+         else
+         {
+@@ -111,16 +120,22 @@ int main(int argc, char** argv)
+             {
+                 printf("  failed to open output file (%s)!!\n", out_name);
+                 CloseExpFiles();
++                free(indata);
+                 continue;
+             }
+             printf("  opened output file!\n");
+ 
+-            ProcessDif(indata, infilesize, outfile);
++            ProcessDif(indata, outfile, yaz);
++            CloseExpFiles();
++            free(indata);
+             fclose(outfile);
+ 
+             printf("  done!\n");
+         }
+     }
+ 
++    free(dia_data);
++    free(yaz);
++
+     return 0;
+ }
+diff --git a/ctgp-dif/dif.cpp b/ctgp-dif-better/dif.cpp
+index a520b23..a6c18b3 100755
+--- a/ctgp-dif/dif.cpp
++++ b/ctgp-dif-better/dif.cpp
+@@ -1,6 +1,5 @@
+ #include "dif.h"
+ #include "types.h"
+-#include "yaz.h"
+ #include <cstring>
+ 
+ #define MAXFILES 15
+@@ -17,6 +16,8 @@ u32 bswap32(u32 v)
+ int OpenExpFiles(const char* pack, const char* rmc, u8* data, u32 size)
+ {
+     memset(expdata, 0, sizeof(expdata));
++    memset(expfilesize, 0, sizeof(expfilesize));
++    memset(expcursors, 0, sizeof(expcursors));
+ 
+     u32 expFiles = bswap32(((DIF_Header*)data)->expansion_count);
+ 
+@@ -29,10 +30,10 @@ int OpenExpFiles(const char* pack, const char* rmc, u8* data, u32 size)
+         DIF_Header* head = (DIF_Header*)data;
+         const char* prefix;
+ 
+-        if (memcmp(head->exp[i].package, "RMC\0\0\0\0\0", 8) == 0)
+-            prefix = rmc;
+-        else
++        if (memcmp(head->exp[i].package, "RMC\0\0\0\0", 8))
+             prefix = pack;
++        else
++            prefix = rmc;
+ 
+         snprintf(
+             filename, 256, "./%s%s", prefix,
+@@ -55,11 +56,11 @@ int OpenExpFiles(const char* pack, const char* rmc, u8* data, u32 size)
+             u8* compData = expdata[i];
+ 
+             u32 expandSize = bswap32(*(u32*)&compData[4]);
+-            printf("expandSize: %08X\n", expandSize);
++            //printf("  expandSize: %08X\n", expandSize);
+ 
+             u8* decompData = (u8*)malloc(expandSize);
+             assert(decompData);
+-            decodeYaz0(compData + 0x10, expfilesize[i], decompData, expandSize);
++            decodeYaz0(compData + 0x10, expfilesize[i]-0x10, decompData, expandSize);
+             free(expdata[i]);
+ 
+             expdata[i] = decompData;
+@@ -79,61 +80,73 @@ void CloseExpFiles()
+         if (expdata[i] != nullptr)
+             free(expdata[i]);
+     }
++    memset(expdata, 0, sizeof(expdata));
++    memset(expfilesize, 0, sizeof(expfilesize));
++    memset(expcursors, 0, sizeof(expcursors));
+ }
+ 
+-void ProcessDif(u8* data, u32 size, FILE* file)
++void ProcessDif(u8* data, FILE* file, Yaz_file_struct* yaz)
+ {
+     DIF_Header* head = (DIF_Header*)data;
+ 
+     u32 dataOffset = bswap32(head->header_size);
+     u32 inputDataSize = bswap32(head->name_offset);
+ 
+-    Yaz_file_struct yaz;
+     if (head->type == TYPE_YAZ0)
+     {
+-        bool ret = Yaz_open(&yaz, file);
++        bool ret = Yaz_open(yaz, file);
+         assert(ret);
++        printf("  opened Yaz0 stream!\n");
+     }
+ 
+-    std::vector<u8> outdata;
++    u8* outdata = (u8*)malloc(head->decomp_size);
++    u32 size = 0;
+ 
+     u32 i = dataOffset;
+-    ;
++
++    expcursors[0] = 0;
++
+     while (i < inputDataSize)
+     {
+-        u32 oldlen = outdata.size();
++        u32 oldlen = size;
+ 
++        //printf("i = 0x%X\n",i);
+         u8 b = data[i++];
++        //printf("%2.2hhX\n",b);
++
++        if (b == 0xF1)
++            break;
++
+         u8 c = b & 15;
+         int y = 0;
+         u32 j = 0;
+         u8 z = 0;
+ 
+-        if (b == 0xF1)
+-            break;
+-
+         switch (c)
+         {
+         case 0: {
+             y = b >> 4;
+-            outdata.insert(outdata.end(), data + i, data + i + y + 1);
++            memcpy(outdata + size, data + i, y + 1);
++            //printf("%d bytes\n", y+1);
+             i += y + 1;
+-            expcursors[0] = outdata.size() - 1;
++            size += y + 1;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 1: {
+-            if (b >> 4 == 15)
+-                break;
+             y = data[i++];
+             u8 s = b >> 4;
+             while (s)
+             {
++                //printf("%2.2hhX",data[i]);
+                 y = (y + 1) * 256 + data[i++];
+                 --s;
+             }
+-            outdata.insert(outdata.end(), data + i, data + i + y + 17);
++            //printf(" for %d bytes\n", y+17);
++            memcpy(outdata + size, data + i, y + 17);
+             i += y + 17;
+-            expcursors[0] = outdata.size() - 1;
++            size += y + 17;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 3: {
+@@ -141,96 +154,94 @@ void ProcessDif(u8* data, u32 size, FILE* file)
+             j = expcursors[0];
+             while (y > -2)
+             {
+-                outdata.insert(outdata.end(), &outdata[j], &outdata[j + 1]);
+-                ++j;
++                outdata[size++] = outdata[j++];
+                 --y;
+             }
+-            expcursors[0] = outdata.size() - 1;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 4: {
+             z = b >> 4;
++            //printf("%2.2hhX\n",data[i]);
+             y = data[i++];
+             j = expcursors[z];
+             if (z)
+             {
+-                expcursors[z] += y + 6;
+-                --z;
+-                outdata.insert(outdata.end(), expdata[z] + j,
+-                               expdata[z] + j + y + 6);
++                expcursors[z--] += y + 6;
++                memcpy(outdata + size, expdata[z] + j, y + 6);
++                size += y + 6;
+             }
+             else
+                 while (y > -6)
+                 {
+-                    outdata.insert(outdata.end(), &outdata[j], &outdata[j + 1]);
+-                    ++j;
++                    outdata[size++] = outdata[j++];
+                     --y;
+                 }
+-            expcursors[0] = outdata.size() - 1;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 5: {
+             z = b >> 4;
+             y = (data[i] + 1) * 256 + data[i + 1];
++            //printf("%2.2hhX%2.2hhX\n",data[i],data[i+1]);
+             i += 2;
+             j = expcursors[z];
+             if (z)
+             {
+                 expcursors[z--] += y + 6;
+-                outdata.insert(outdata.end(), expdata[z] + j,
+-                               expdata[z] + j + y + 6);
++                memcpy(outdata + size, expdata[z] + j, y + 6);
++                size += y + 6;
+             }
+             else
+                 while (y > -6)
+                 {
+-                    outdata.insert(outdata.end(), &outdata[j], &outdata[j + 1]);
+-                    ++j;
++                    outdata[size++] = outdata[j++];
+                     --y;
+                 }
+-            expcursors[0] = outdata.size() - 1;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 6: {
+             z = b >> 4;
+             y = (data[i] + 1) * 65536 + (data[i + 1] + 1) * 256 + data[i + 2];
++            //printf("%2.2hhX%2.2hhX%2.2hhX\n",data[i],data[i+1],data[i+2]);
+             i += 3;
+             j = expcursors[z];
+             if (z)
+             {
+                 expcursors[z--] += y + 6;
+-                outdata.insert(outdata.end(), expdata[z] + j,
+-                               expdata[z] + j + y + 6);
++                memcpy(outdata + size, expdata[z] + j, y + 6);
++                size += y + 6;
+             }
+             else
+                 while (y > -6)
+                 {
+-                    outdata.insert(outdata.end(), &outdata[j], &outdata[j + 1]);
+-                    ++j;
++                    outdata[size++] = outdata[j++];
+                     --y;
+                 }
+-            expcursors[0] = outdata.size() - 1;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 7: {
+             z = b >> 4;
+             y = (data[i] + 1) * 1677216 + (data[i + 1] + 1) * 65536 +
+                 (data[i + 2] + 1) * 256 + data[i + 3];
++            //printf("%2.2hhX%2.2hhX%2.2hhX%2.2hhX\n",data[i],data[i+1],data[i+2],data[i+3]);
+             i += 4;
+             j = expcursors[z];
+             if (z)
+             {
+                 expcursors[z--] += y + 6;
+-                outdata.insert(outdata.end(), expdata[z] + j,
+-                               expdata[z] + j + y + 6);
++                memcpy(outdata + size, expdata[z] + j, y + 6);
++                size += y + 6;
+             }
+             else
+                 while (y > -6)
+                 {
+-                    outdata.insert(outdata.end(), &outdata[j], &outdata[j + 1]);
+-                    ++j;
++                    outdata[size++] = outdata[j++];
+                     --y;
+                 }
+-            expcursors[0] = outdata.size() - 1;
++            expcursors[0] = size - 1;
+             break;
+         }
+         case 8: {
+@@ -240,6 +251,7 @@ void ProcessDif(u8* data, u32 size, FILE* file)
+         }
+         case 9: {
+             z = b >> 4;
++            //printf("%2.2hhX\n",data[i]);
+             y = data[i++];
+             expcursors[z] -= (y + 1);
+             break;
+@@ -247,6 +259,7 @@ void ProcessDif(u8* data, u32 size, FILE* file)
+         case 10: {
+             z = b >> 4;
+             y = (data[i] + 1) * 256 + data[i + 1];
++            //printf("%2.2hhX%2.2hhX\n",data[i],data[i+1]);
+             i += 2;
+             expcursors[z] -= (y + 1);
+             break;
+@@ -254,6 +267,7 @@ void ProcessDif(u8* data, u32 size, FILE* file)
+         case 11: {
+             z = b >> 4;
+             y = (data[i] + 1) * 65536 + (data[i + 1] + 1) * 256 + data[i + 2];
++            //printf("%2.2hhX%2.2hhX%2.2hhX\n",data[i],data[i+1],data[i+2]);
+             i += 3;
+             expcursors[z] -= (y + 1);
+             break;
+@@ -262,24 +276,28 @@ void ProcessDif(u8* data, u32 size, FILE* file)
+             z = b >> 4;
+             y = (data[i] + 1) * 16777216 + (data[i + 1] + 1) * 65536 +
+                 (data[i + 2] + 1) * 256 + data[i + 3];
++            //printf("%2.2hhX%2.2hhX%2.2hhX%2.2hhX\n",data[i],data[i+1],data[i+2],data[i+3]);
+             i += 4;
+             expcursors[z] -= (y + 1);
+             break;
+         }
+         case 13: {
+             z = b >> 4;
++            //printf("%2.2hhX\n",data[i]);
+             expcursors[z] += data[i++] + 1;
+             break;
+         }
+         case 14: {
+             z = b >> 4;
+             expcursors[z] += (data[i] + 1) * 256 + data[i + 1] + 1;
++            //printf("%2.2hhX%2.2hhX\n",data[i],data[i+1]);
+             i += 2;
+             break;
+         }
+         case 15: {
+             z = b >> 4;
+             expcursors[z] = data[i] * 65536 + data[i + 1] * 256 + data[i + 2];
++            //printf("%2.2hhX%2.2hhX%2.2hhX\n",data[i],data[i+1],data[i+2]);
+             i += 3;
+             break;
+         }
+@@ -291,27 +309,35 @@ void ProcessDif(u8* data, u32 size, FILE* file)
+ 
+         if (head->type == TYPE_YAZ0)
+         {
+-            Yaz_write(&yaz, outdata.data() + oldlen, outdata.size() - oldlen);
++            int reent;
++            for (u32 yi = oldlen; yi < size; yi++) {
++                Yaz_fputc_r(&reent, outdata[yi], yaz);
++            }
+         }
+         else
+         {
+-            fwrite(outdata.data() + oldlen, outdata.size() - oldlen, 1, file);
++            fwrite(outdata + oldlen, size - oldlen, 1, file);
+         }
+     }
+ 
++    free(outdata);
++
+     if (head->type == TYPE_YAZ0)
+     {
+-        Yaz_write(&yaz, nullptr, 0);
++        int reent;
++        Yaz_fputc_r(&reent, -1, yaz);
+ 
+-        fseek(yaz.file, 4, SEEK_SET);
++        fseek(yaz->file, 4, SEEK_SET);
+ 
+         u8 decompSize[4];
+-        decompSize[0] = yaz.iteration >> 24;
+-        decompSize[1] = yaz.iteration >> 16;
+-        decompSize[2] = yaz.iteration >> 8;
+-        decompSize[3] = yaz.iteration;
++        decompSize[0] = yaz->iteration >> 24;
++        decompSize[1] = yaz->iteration >> 16;
++        decompSize[2] = yaz->iteration >> 8;
++        decompSize[3] = yaz->iteration;
++
++        fwrite(decompSize, 1, 4, yaz->file);
+ 
+-        fwrite(decompSize, 1, 4, yaz.file);
++        printf("  saved as Yaz0!\n");
+     }
+ }
+ 
+diff --git a/ctgp-dif/dif.h b/ctgp-dif-better/dif.h
+index d37c74d..b58e9d9 100755
+--- a/ctgp-dif/dif.h
++++ b/ctgp-dif-better/dif.h
+@@ -4,9 +4,12 @@
+ #include <vector>
+ 
+ #include "dif_archive.h"
++#include "yaz.h"
++
++static Yaz_file_struct* yaz;
+ 
+ u32 bswap32(u32 v);
+ int OpenExpFiles(const char* pack, const char* rmc, u8* data, u32 size);
+ void CloseExpFiles();
+-void ProcessDif(u8* data, u32 size, FILE* file);
++void ProcessDif(u8* data, FILE* file, Yaz_file_struct* yaz);
+ int dif_main(int argc, char** argv);
+diff --git a/ctgp-dif/dif_archive.h b/ctgp-dif-better/dif_archive.h
+index 7a08e83..0b80eb9 100755
+--- a/ctgp-dif/dif_archive.h
++++ b/ctgp-dif-better/dif_archive.h
+@@ -21,7 +21,7 @@ typedef struct _dia_version
+     u8 major;
+     u8 middle;
+     u16 minor;
+-} DIA_Version; /* "%1.1hhX.%02.2hhX.%04.4hX", major, middle, minor */
++} DIA_Version; /* "%1.1hhX.%2.2hhX.%4.4hX", major, middle, minor */
+ 
+ typedef struct _dia_header
+ {
+@@ -34,20 +34,19 @@ typedef struct _dia_header
+     u32 total_decomp_size;
+     u32 sign_size;
+     u8 sign[0x30]; /* excess space at the end is filled with zeroes. */
+-    u32 unknown_54; /* always 1. maybe a count of DIF tables? */
+-    u32 diftab_offset;
++    u32 fomver_ver_count;
++    u32 former_ver_offset;
+     u32 diftab_entry_count;
+     u32 diftab_entry_offset;
+ } DIA_Header;
+ 
+-typedef struct _dia_diftab_hdr
++typedef struct _dia_former_ver
+ {
+     char package[8]; /* sometimes "RMC", meaning this update doesn't rely on a
+                         previous version. */
+     DIA_Version former_version; /* RMC is always 1.00.0000. */
+-    /* (4) zero bytes appear between the header & the actual table.
+-       realistically, they are probably part of the header. */
+-} DIA_Diftab_Hdr;
++    u32 unknown_c; /* always 0. */
++} DIA_Former_Version;
+ 
+ typedef struct _dia_diftab_entry
+ {
+diff --git a/ctgp-dif/yaz.cpp b/ctgp-dif-better/yaz.cpp
+index da4af02..7bdea57 100755
+--- a/ctgp-dif/yaz.cpp
++++ b/ctgp-dif-better/yaz.cpp
+@@ -4,7 +4,7 @@
+ #include <cstdlib>
+ #include <cstring>
+ 
+-u16 DAT_80ad1160[HASH_MAP_SIZE];
++static u16 DAT_80ad1160[HASH_MAP_SIZE];
+ 
+ u32 hash1(u32 value)
+ {
+@@ -16,7 +16,7 @@ u32 hash1(u32 value)
+ 
+ int Yaz_buffer_putcode_r(int* reent, u8* file2)
+ {
+-    auto file = (Yaz_file_struct*)file2;
++    Yaz_file_struct* file = (Yaz_file_struct*)file2;
+ 
+     fwrite(file->codeBuffer, file->codeBufferLocation, 1, file->file);
+     return 0;
+@@ -24,7 +24,7 @@ int Yaz_buffer_putcode_r(int* reent, u8* file2)
+ 
+ #define ASSERT_FAIL(...) assert(false)
+ 
+-static inline int Yaz_fputc_r(int* reent, int value, Yaz_file_struct* file)
++int Yaz_fputc_r(int* reent, int value, Yaz_file_struct* file)
+ 
+ {
+     bool bVar1;
+@@ -313,8 +313,7 @@ static inline int Yaz_fputc_r(int* reent, int value, Yaz_file_struct* file)
+                     }
+                 }
+             }
+-            *(u16*)(file->backBuffer + (uVar17 + 0x808) * 0x2 + -0x4) =
+-                (u16)uVar2 | 0xc000;
++            file->hashMap[uVar17] = (u16)uVar2 | 0xc000;
+             uVar9 = uVar9 - (res >> 0xf);
+         LAB_807eb78c:
+             file->field7_0x1018 = uVar9;
+@@ -578,8 +577,9 @@ LAB_807eb200:
+ 
+ bool Yaz_open(Yaz_file_struct* file, FILE* fptr)
+ {
+-    memset(file, 0, sizeof(Yaz_file_struct));
+-
++    memset(DAT_80ad1160, 0xff, sizeof(DAT_80ad1160));
++    memset(file, 0, sizeof(*file));
++    
+     file->file = fptr;
+     if (!file->file)
+         return false;
+@@ -588,34 +588,12 @@ bool Yaz_open(Yaz_file_struct* file, FILE* fptr)
+         0x59, 0x61, 0x7A, 0x30, 0x00, 0x00, 0x00, 0x00,
+         0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     };
+-
++    
+     int ret = fwrite(szsHeader, sizeof(szsHeader), 1, file->file);
+     assert(ret == 1);
+-
++    
+     file->copyLocation = -1;
+-    return true;
+-}
+-
+-bool Yaz_write(Yaz_file_struct* file, u8* data, u32 len)
+-{
+-    int reent;
+-
+-    if (data != nullptr)
+-    {
+-        for (u32 i = 0; i < len; i++)
+-        {
+-            int ret = Yaz_fputc_r(&reent, data[i], file);
+-            if (ret < 0)
+-                return false;
+-        }
+-    }
+-    else
+-    {
+-        int ret = Yaz_fputc_r(&reent, -1, file);
+-        if (ret < 0)
+-            return false;
+-    }
+-
++    
+     return true;
+ }
+ 
+diff --git a/ctgp-dif/yaz.h b/ctgp-dif-better/yaz.h
+index ed53e06..4f2dd40 100755
+--- a/ctgp-dif/yaz.h
++++ b/ctgp-dif-better/yaz.h
+@@ -27,8 +27,8 @@ struct Yaz_file_struct
+     u8 codeBuffer[0x9248 - 0x922E]; // not actual size probably
+ };
+ 
++int Yaz_fputc_r(int* reent, int value, Yaz_file_struct* file);
+ bool Yaz_open(Yaz_file_struct* file, FILE* fptr);
+-bool Yaz_write(Yaz_file_struct* file, u8* data, u32 len);
+ 
+ struct Ret
+ {

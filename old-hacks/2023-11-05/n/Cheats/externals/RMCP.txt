@@ -1,0 +1,5 @@
+memcmp=0x8000F314
+DVDLowRead=0x80166334
+OSReport=0x801A25D0
+OSDisableInterrupts=0x801A65AC
+OSRestoreInterrupts=0x801A65D4

@@ -1,0 +1,1 @@
+Various python tools for encrypting/decrypting CTGP-R formats, intended to help with reverse engineering. The `pycryptodome` Python package is required. Please read the scripts for more information on how to use them.

@@ -1,0 +1,1 @@
+Tools in this directory were written by both me and Wit. They are extremely messy and quickly hacked together but they can be used to apply CTGP-R updates. The most up-to-date and functional tool is in [ctgp-dif-better](ctgp-dif-better).

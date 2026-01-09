@@ -1,0 +1,35 @@
+diff --git a/dif-old.py b/dif.py
+index eafb4b7..368fa9b 100755
+--- a/dif-old.py
++++ b/dif.py
+@@ -56,6 +56,9 @@ while i < h[3]:
+         if b >> 4 == 15:
+             break
+         y = indata[i]; i += 1
++        if b >> 4:
++            y = (y + 1) * 256 + indata[i]; i += 1
++            print(y)
+         outdata += indata[i:i+y+17]
+         i += y + 17
+         j = len(outdata)
+@@ -82,12 +85,8 @@ while i < h[3]:
+     elif c == 10:
+         y = indata[i] * 256 + indata[i+1]; i += 2
+         j = j - y - 0x100
+-        printf("command 10: j = ")
+     else:
+-        break
+-
+-outfile.write(outdata)
+-outfile.close()
++        raise Exception(f"unknown command {c:X} at 0x{i-1:X}!")
+ 
+ if i > h[3]:
+     raise Exception("DIF0 leaks into filename!")
+@@ -95,4 +94,5 @@ if i > h[3]:
+ if len(outdata) != h[6]:
+     raise Exception("wrong uncompressed size!")
+ 
+-
++outfile.write(outdata)
++outfile.close()
