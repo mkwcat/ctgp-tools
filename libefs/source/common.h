@@ -80,7 +80,7 @@ struct _reent {
 #define ATTR_HIDDEN 0x02    // Hidden
 #define ATTR_READONLY 0x01  // Read only
 
-const unsigned FEATURE_MEDIUM_CANWRITE = 1;
+static const unsigned FEATURE_MEDIUM_CANWRITE = 1;
 
 #define DEFAULT_CACHE_PAGES 4
 #define DEFAULT_SECTORS_PAGE 64

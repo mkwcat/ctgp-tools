@@ -1,28 +1,24 @@
-#include "common.h"
+#include "lock.h"
 
-#ifndef mutex_t
-typedef int mutex_t;
-#endif
-
-void __attribute__((weak)) _FAT_lock_init(
+void _FAT_lock_init(
     mutex_t* mutex
 ) {
     return;
 }
 
-void __attribute__((weak)) _FAT_lock_deinit(
+void _FAT_lock_deinit(
     mutex_t* mutex
 ) {
     return;
 }
 
-void __attribute__((weak)) _FAT_lock(
+void _FAT_lock(
     mutex_t* mutex
 ) {
     return;
 }
 
-void __attribute__((weak)) _FAT_unlock(
+void _FAT_unlock(
     mutex_t* mutex
 ) {
     return;

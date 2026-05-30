@@ -28,12 +28,7 @@
 
 #pragma once
 
-#include "common.h"
-
-// We still need a blank lock type
-#ifndef mutex_t
 typedef int mutex_t;
-#endif
 
 void _FAT_lock_init(mutex_t* mutex);
 void _FAT_lock_deinit(mutex_t* mutex);
