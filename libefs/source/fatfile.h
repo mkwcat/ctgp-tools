@@ -66,7 +66,7 @@ struct _FILE_STRUCT {
 
 typedef struct _FILE_STRUCT FILE_STRUCT;
 
-void* _FAT_open_r(struct _reent* r, void* fileStruct, const char* path, int flags, int mode);
+FILE_STRUCT* _FAT_open_r(struct _reent* r, FILE_STRUCT* fileStruct, const char* path, int flags, int mode);
 
 int _FAT_close_r(struct _reent* r, void* fd);
 

@@ -142,8 +142,8 @@ int FAT_setAttr(
     return 0;
 }
 
-void* _FAT_open_r(
-    struct _reent* r, void* fileStruct, const char* path, int flags, int mode
+FILE_STRUCT* _FAT_open_r(
+    struct _reent* r, FILE_STRUCT* fileStruct, const char* path, int flags, int mode
 ) {
     PARTITION*   partition = NULL;
     bool         fileExists;
