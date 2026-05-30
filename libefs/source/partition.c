@@ -507,7 +507,7 @@ PARTITION* _FAT_efs_partition_create(
 
     DISC_INTERFACE* disc = _FAT_efs_disc_create(path, type);
     return labels[type] =
-               _FAT_partition_constructor(disc, 0, DEFAULT_CACHE_PAGES, DEFAULT_SECTORS_PAGE);
+               _FAT_partition_constructor(disc, DEFAULT_CACHE_PAGES, DEFAULT_SECTORS_PAGE, 0);
 }
 
 PARTITION* _FAT_partition_getPartitionFromPath(

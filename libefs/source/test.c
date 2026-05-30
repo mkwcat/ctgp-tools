@@ -10,5 +10,5 @@ int main(
     FILE_STRUCT   f;
     struct _reent r;
     FILE_STRUCT*  fp = _FAT_open_r(&r, &f, "efa:/packages.bin", 1, 1);
-    printf("fp: %p\n", (void*) fp);
+    printf("fp: %p, errno: %d\n", (void*) fp, r._errno);
 }

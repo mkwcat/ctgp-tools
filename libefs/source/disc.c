@@ -91,6 +91,17 @@ static uint8_t* blobEncodeIv(
     return iv;
 }
 
+static void printHex(
+    const uint8_t* p, size_t n
+) {
+    for (size_t i = 0; i < n; i++) {
+        printf("%02X ", p[i]);
+        if (((i + 1) % 16) == 0) {
+            puts("");
+        }
+    }
+}
+
 bool _FAT_disc_readSectors(
     DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, void* buffer
 ) {
@@ -128,6 +139,8 @@ bool _FAT_disc_readSectors(
     }
     disc->sector = sector + numSectors;
 
+    printf("sector dump @ %u\n", sector);
+    printHex((uint8_t*) buffer, numSectors * SECTOR_SIZE);
     return true;
 }
 
