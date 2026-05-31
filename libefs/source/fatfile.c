@@ -127,7 +127,7 @@ int efs_setAttr(
         ,
         fat_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector // cluster
         ,
-        entryEnd.offset * fat_dir_entry_DATA_SIZE + fat_dir_entry_attributes // offset
+        entryEnd.offset * DIR_ENTRY_DATA_SIZE + fat_dir_entry_attributes // offset
         ,
         1 // Size in bytes
     );
@@ -267,7 +267,7 @@ fat_file* efs_open_r(
             }
             // Create the entry data
             strncpy(dirEntry.filename, pathEnd, fat_NAME_MAX - 1);
-            memset(dirEntry.entryData, 0, fat_dir_entry_DATA_SIZE);
+            memset(dirEntry.entryData, 0, DIR_ENTRY_DATA_SIZE);
 
             // Set the creation time and date
             dirEntry.entryData[fat_dir_entry_cTime_ms] = 0;
@@ -380,7 +380,7 @@ Returns 0 on success, an error code on failure.
 int32_t fat_syncToDisc(
     fat_file* file
 ) {
-    uint8_t dirEntryData[fat_dir_entry_DATA_SIZE];
+    uint8_t dirEntryData[DIR_ENTRY_DATA_SIZE];
 
     if (!file || !file->inUse) {
         return EBADF;
@@ -392,7 +392,7 @@ int32_t fat_syncToDisc(
             file->partition->cache, dirEntryData,
             fat_fat_clusterToSector(file->partition, file->dirEntryEnd.cluster) +
                 file->dirEntryEnd.sector,
-            file->dirEntryEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            file->dirEntryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
 
         // Write new data to the directory entry
@@ -418,7 +418,7 @@ int32_t fat_syncToDisc(
             file->partition->cache, dirEntryData,
             fat_fat_clusterToSector(file->partition, file->dirEntryEnd.cluster) +
                 file->dirEntryEnd.sector,
-            file->dirEntryEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            file->dirEntryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
 
         // Flush any sectors in the disc cache

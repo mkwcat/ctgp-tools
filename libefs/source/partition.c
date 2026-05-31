@@ -263,7 +263,7 @@ static fat_partition* fat_partition_constructor_buf(
         partition->fat.fatStart + (sectorBuffer[BPB_numFATs] * partition->fat.sectorsPerFat);
     partition->dataStart =
         partition->rootDirStart +
-        ((u8array_to_u16(sectorBuffer, BPB_rootEntries) * fat_dir_entry_DATA_SIZE) /
+        ((u8array_to_u16(sectorBuffer, BPB_rootEntries) * DIR_ENTRY_DATA_SIZE) /
          partition->bytesPerSector);
 
     partition->totalSize =

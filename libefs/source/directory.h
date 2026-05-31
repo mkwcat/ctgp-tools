@@ -37,7 +37,7 @@ extern "C" {
 #include "partition.h"
 
 enum {
-    fat_dir_entry_DATA_SIZE = 0x20,
+    DIR_ENTRY_DATA_SIZE = 0x20,
     MAX_LFN_LENGTH          = 256,
     MAX_ALIAS_LENGTH        = 13,
     LFN_ENTRY_LENGTH        = 13,
@@ -80,7 +80,7 @@ typedef struct {
 } fat_dir_entry_position;
 
 typedef struct {
-    uint8_t entryData[fat_dir_entry_DATA_SIZE];
+    uint8_t entryData[DIR_ENTRY_DATA_SIZE];
     fat_dir_entry_position
         dataStart; // Points to the start of the LFN entries of a file, or the alias for no LFN
     fat_dir_entry_position dataEnd; // Always points to the file/directory's alias entry

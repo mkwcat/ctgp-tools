@@ -351,7 +351,7 @@ int efs_mkdir(
     fat_dir_entry  dirEntry;
     const char*    pathEnd;
     uint32_t       parentCluster, dirCluster;
-    uint8_t        newEntryData[fat_dir_entry_DATA_SIZE];
+    uint8_t        newEntryData[DIR_ENTRY_DATA_SIZE];
 
     partition = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
@@ -408,7 +408,7 @@ int efs_mkdir(
     }
     // Create the entry data
     strncpy(dirEntry.filename, pathEnd, fat_NAME_MAX - 1);
-    memset(dirEntry.entryData, 0, fat_dir_entry_DATA_SIZE);
+    memset(dirEntry.entryData, 0, DIR_ENTRY_DATA_SIZE);
 
     // Set the creation time and date
     dirEntry.entryData[fat_dir_entry_cTime_ms] = 0;
@@ -440,7 +440,7 @@ int efs_mkdir(
     }
 
     // Create the dot entry within the directory
-    memset(newEntryData, 0, fat_dir_entry_DATA_SIZE);
+    memset(newEntryData, 0, DIR_ENTRY_DATA_SIZE);
     memset(newEntryData, ' ', 11);
     newEntryData[fat_dir_entry_name]       = '.';
     newEntryData[fat_dir_entry_attributes] = ATTRIB_DIR;
@@ -450,7 +450,7 @@ int efs_mkdir(
     // Write it to the directory, erasing that sector in the process
     fat_cache_eraseWritePartialSector(
         partition->cache, newEntryData, fat_fat_clusterToSector(partition, dirCluster), 0,
-        fat_dir_entry_DATA_SIZE
+        DIR_ENTRY_DATA_SIZE
     );
 
     // Create the double dot entry within the directory
@@ -467,7 +467,7 @@ int efs_mkdir(
     // Write it to the directory
     fat_cache_writePartialSector(
         partition->cache, newEntryData, fat_fat_clusterToSector(partition, dirCluster),
-        fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+        DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
     );
 
     // Flush any sectors in the disc cache

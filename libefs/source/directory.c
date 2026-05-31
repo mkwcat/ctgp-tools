@@ -44,8 +44,8 @@
 
 // Directory entry codes
 enum {
-    fat_dir_entry_LAST = 0x00,
-    fat_dir_entry_FREE = 0xE5,
+    DIR_ENTRY_LAST = 0x00,
+    DIR_ENTRY_FREE = 0xE5,
 };
 
 typedef uint16_t ucs2_t;
@@ -222,7 +222,7 @@ static bool fat_directory_entryGetAlias(
     int32_t j   = 0;
 
     destName[0] = '\0';
-    if (entryData[0] != fat_dir_entry_FREE) {
+    if (entryData[0] != DIR_ENTRY_FREE) {
         if (entryData[0] == '.') {
             destName[0] = '.';
             if (entryData[1] == '.') {
@@ -274,7 +274,7 @@ static bool fat_directory_incrementDirEntryPosition(
 
     // Increment offset, wrapping at the end of a sector
     ++position.offset;
-    if (position.offset == partition->bytesPerSector / fat_dir_entry_DATA_SIZE) {
+    if (position.offset == partition->bytesPerSector / DIR_ENTRY_DATA_SIZE) {
         position.offset = 0;
         // Increment sector when wrapping
         ++position.sector;
@@ -342,7 +342,7 @@ bool fat_directory_getNextEntry(
         fat_cache_readPartialSector(
             partition->cache, entryData,
             fat_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector,
-            entryEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            entryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
 
         if (entryData[fat_dir_entry_attributes] == ATTRIB_LFN) {
@@ -374,9 +374,9 @@ bool fat_directory_getNextEntry(
             }
         } else if (entryData[fat_dir_entry_attributes] & ATTRIB_VOL) {
             // This is a volume name, don't bother with it
-        } else if (entryData[0] == fat_dir_entry_LAST) {
+        } else if (entryData[0] == DIR_ENTRY_LAST) {
             notFound = true;
-        } else if ((entryData[0] != fat_dir_entry_FREE) && (entryData[0] > 0x20) &&
+        } else if ((entryData[0] != DIR_ENTRY_FREE) && (entryData[0] > 0x20) &&
                    !(entryData[fat_dir_entry_attributes] & ATTRIB_VOL)) {
             if (lfnExists) {
                 // Calculate file checksum
@@ -411,7 +411,7 @@ bool fat_directory_getNextEntry(
         // Fill in the directory entry struct
         entry->dataStart = entryStart;
         entry->dataEnd   = entryEnd;
-        memcpy(entry->entryData, entryData, fat_dir_entry_DATA_SIZE);
+        memcpy(entry->entryData, entryData, DIR_ENTRY_DATA_SIZE);
         return true;
     }
 }
@@ -440,7 +440,7 @@ static bool fat_directory_getRootEntry(
     memset(entry->filename, '\0', fat_NAME_MAX);
     entry->filename[0] = '.';
 
-    memset(entry->entryData, 0, fat_dir_entry_DATA_SIZE);
+    memset(entry->entryData, 0, DIR_ENTRY_DATA_SIZE);
     memset(entry->entryData, ' ', 11);
     entry->entryData[0]                        = '.';
 
@@ -457,7 +457,7 @@ bool fat_directory_getVolumeLabel(
 ) {
     fat_dir_entry          entry;
     fat_dir_entry_position entryEnd;
-    uint8_t                entryData[fat_dir_entry_DATA_SIZE];
+    uint8_t                entryData[DIR_ENTRY_DATA_SIZE];
     int32_t                i;
     bool                   end;
 
@@ -479,18 +479,18 @@ bool fat_directory_getVolumeLabel(
         if (!fat_cache_readPartialSector(
                 partition->cache, entryData,
                 fat_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector,
-                entryEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+                entryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
             )) { // error reading
             return false;
         }
 
         if (entryData[fat_dir_entry_attributes] == ATTRIB_VOL &&
-            entryData[0] != fat_dir_entry_FREE) {
+            entryData[0] != DIR_ENTRY_FREE) {
             for (i = 0; i < 11; i++) {
                 label[i] = entryData[fat_dir_entry_name + i];
             }
             return true;
-        } else if (entryData[0] == fat_dir_entry_LAST) {
+        } else if (entryData[0] == DIR_ENTRY_LAST) {
             end = true;
         }
 
@@ -511,7 +511,7 @@ bool fat_directory_entryFromPosition(
     ucs2_t                 lfn[MAX_LFN_LENGTH];
     int32_t                i;
     int32_t                lfnPos;
-    uint8_t                entryData[fat_dir_entry_DATA_SIZE];
+    uint8_t                entryData[DIR_ENTRY_DATA_SIZE];
 
     memset(entry->filename, '\0', fat_NAME_MAX);
 
@@ -521,13 +521,13 @@ bool fat_directory_entryFromPosition(
         fat_cache_readPartialSector(
             partition->cache, entryData,
             fat_fat_clusterToSector(partition, entryStart.cluster) + entryStart.sector,
-            entryStart.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            entryStart.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
 
         if ((entryStart.cluster == entryEnd.cluster) && (entryStart.sector == entryEnd.sector) &&
             (entryStart.offset == entryEnd.offset)) {
             // Copy the entry data and stop, since this is the last section of the directory entry
-            memcpy(entry->entryData, entryData, fat_dir_entry_DATA_SIZE);
+            memcpy(entry->entryData, entryData, DIR_ENTRY_DATA_SIZE);
             finished = true;
         } else {
             // Copy the long file name data
@@ -700,7 +700,7 @@ bool fat_directory_removeEntry(
     fat_dir_entry_position entryEnd   = entry->dataEnd;
     bool                   entryStillValid;
     bool                   finished;
-    uint8_t                entryData[fat_dir_entry_DATA_SIZE];
+    uint8_t                entryData[DIR_ENTRY_DATA_SIZE];
 
     // Create an empty directory entry to overwrite the old ones with
     for (entryStillValid = true, finished = false; entryStillValid && !finished;
@@ -708,13 +708,13 @@ bool fat_directory_removeEntry(
         fat_cache_readPartialSector(
             partition->cache, entryData,
             fat_fat_clusterToSector(partition, entryStart.cluster) + entryStart.sector,
-            entryStart.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            entryStart.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
-        entryData[0] = fat_dir_entry_FREE;
+        entryData[0] = DIR_ENTRY_FREE;
         fat_cache_writePartialSector(
             partition->cache, entryData,
             fat_fat_clusterToSector(partition, entryStart.cluster) + entryStart.sector,
-            entryStart.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            entryStart.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
         if ((entryStart.cluster == entryEnd.cluster) && (entryStart.sector == entryEnd.sector) &&
             (entryStart.offset == entryEnd.offset)) {
@@ -734,7 +734,7 @@ static bool fat_directory_findEntryGap(
 ) {
     fat_dir_entry_position gapStart;
     fat_dir_entry_position gapEnd;
-    uint8_t                entryData[fat_dir_entry_DATA_SIZE];
+    uint8_t                entryData[DIR_ENTRY_DATA_SIZE];
     uint32_t               dirEntryRemain;
     bool                   endOfDirectory, entryStillValid;
 
@@ -753,15 +753,15 @@ static bool fat_directory_findEntryGap(
         fat_cache_readPartialSector(
             partition->cache, entryData,
             fat_fat_clusterToSector(partition, gapEnd.cluster) + gapEnd.sector,
-            gapEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+            gapEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
         );
-        if (entryData[0] == fat_dir_entry_LAST) {
+        if (entryData[0] == DIR_ENTRY_LAST) {
             if (dirEntryRemain == size) {
                 gapStart = gapEnd;
             }
             --dirEntryRemain;
             endOfDirectory = true;
-        } else if (entryData[0] == fat_dir_entry_FREE) {
+        } else if (entryData[0] == DIR_ENTRY_FREE) {
             if (dirEntryRemain == size) {
                 gapStart = gapEnd;
             }
@@ -784,7 +784,7 @@ static bool fat_directory_findEntryGap(
     entry->dataStart = gapStart;
 
     if (endOfDirectory) {
-        memset(entryData, fat_dir_entry_LAST, fat_dir_entry_DATA_SIZE);
+        memset(entryData, DIR_ENTRY_LAST, DIR_ENTRY_DATA_SIZE);
         dirEntryRemain += 1; // Increase by one to take account of End Of Directory Marker
         while ((dirEntryRemain > 0) && entryStillValid) {
             // Get the gapEnd before incrementing it, so the second to last one is saved
@@ -796,7 +796,7 @@ static bool fat_directory_findEntryGap(
             fat_cache_writePartialSector(
                 partition->cache, entryData,
                 fat_fat_clusterToSector(partition, gapEnd.cluster) + gapEnd.sector,
-                gapEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+                gapEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
             );
         }
         if (!entryStillValid) {
@@ -964,7 +964,7 @@ bool fat_directory_addEntry(
     fat_partition* partition, fat_dir_entry* entry, uint32_t dirCluster
 ) {
     uint32_t               entrySize;
-    uint8_t                lfnEntry[fat_dir_entry_DATA_SIZE];
+    uint8_t                lfnEntry[DIR_ENTRY_DATA_SIZE];
     int32_t                i, j; // Must be signed for use when decrementing in for loop
     char*                  tmpCharPtr;
     fat_dir_entry_position curEntryPos;
@@ -1139,14 +1139,14 @@ bool fat_directory_addEntry(
                 fat_cache_writePartialSector(
                     partition->cache, lfnEntry,
                     fat_fat_clusterToSector(partition, curEntryPos.cluster) + curEntryPos.sector,
-                    curEntryPos.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+                    curEntryPos.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
                 );
             } else {
                 // Alias & file data
                 fat_cache_writePartialSector(
                     partition->cache, entry->entryData,
                     fat_fat_clusterToSector(partition, curEntryPos.cluster) + curEntryPos.sector,
-                    curEntryPos.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
+                    curEntryPos.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
                 );
             }
         }
