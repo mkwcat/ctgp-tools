@@ -33,26 +33,25 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _CACHE_H
-#define _CACHE_H
+#pragma once
 
 #include "common.h"
 #include "disc.h"
 
 typedef struct CACHE_ENTRY {
-    sec_t        sector;
-    unsigned int count;
-    unsigned int last_access;
-    bool         dirty;
-    uint8_t*     cache;
+    sec_t    sector;
+    uint32_t count;
+    uint32_t last_access;
+    bool     dirty;
+    uint8_t* cache;
 } CACHE_ENTRY;
 
 typedef struct CACHE {
     DISC_INTERFACE* disc;
     sec_t           endOfPartition;
-    unsigned int    numberOfPages;
-    unsigned int    sectorsPerPage;
-    unsigned int    bytesPerSector;
+    uint32_t        numberOfPages;
+    uint32_t        sectorsPerPage;
+    uint32_t        bytesPerSector;
     CACHE_ENTRY*    cacheEntries;
 } CACHE;
 
@@ -63,12 +62,12 @@ offset is the position to start reading from
 size is the amount of data to read
 Precondition: offset + size <= BYTES_PER_READ
 */
-bool _FAT_cache_readPartialSector(
-    CACHE* cache, void* buffer, sec_t sector, unsigned int offset, size_t size
+bool fat_cache_readPartialSector(
+    CACHE* cache, void* buffer, sec_t sector, uint32_t offset, size_t size
 );
 
-bool _FAT_cache_readLittleEndianValue(
-    CACHE* cache, uint32_t* value, sec_t sector, unsigned int offset, int num_bytes
+bool fat_cache_readLittleEndianValue(
+    CACHE* cache, uint32_t* value, sec_t sector, uint32_t offset, int32_t num_bytes
 );
 
 /*
@@ -79,12 +78,12 @@ offset is the position to start writing to
 size is the amount of data to write
 Precondition: offset + size <= BYTES_PER_READ
 */
-bool _FAT_cache_writePartialSector(
-    CACHE* cache, const void* buffer, sec_t sector, unsigned int offset, size_t size
+bool fat_cache_writePartialSector(
+    CACHE* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
 );
 
-bool _FAT_cache_writeLittleEndianValue(
-    CACHE* cache, const uint32_t value, sec_t sector, unsigned int offset, int num_bytes
+bool fat_cache_writeLittleEndianValue(
+    CACHE* cache, const uint32_t value, sec_t sector, uint32_t offset, int32_t num_bytes
 );
 
 /*
@@ -95,50 +94,48 @@ offset is the position to start writing to
 size is the amount of data to write
 Precondition: offset + size <= BYTES_PER_READ
 */
-bool _FAT_cache_eraseWritePartialSector(
-    CACHE* cache, const void* buffer, sec_t sector, unsigned int offset, size_t size
+bool fat_cache_eraseWritePartialSector(
+    CACHE* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
 );
 
 /*
 Read several sectors from the cache
 */
-bool _FAT_cache_readSectors(CACHE* cache, sec_t sector, sec_t numSectors, void* buffer);
+bool fat_cache_readSectors(CACHE* cache, sec_t sector, sec_t numSectors, void* buffer);
 
 /*
 Read a full sector from the cache
 */
-static inline bool _FAT_cache_readSector(
+static inline bool fat_cache_readSector(
     CACHE* cache, void* buffer, sec_t sector
 ) {
-    return _FAT_cache_readPartialSector(cache, buffer, sector, 0, cache->bytesPerSector);
+    return fat_cache_readPartialSector(cache, buffer, sector, 0, cache->bytesPerSector);
 }
 
 /*
 Write a full sector to the cache
 */
-static inline bool _FAT_cache_writeSector(
+static inline bool fat_cache_writeSector(
     CACHE* cache, const void* buffer, sec_t sector
 ) {
-    return _FAT_cache_writePartialSector(cache, buffer, sector, 0, cache->bytesPerSector);
+    return fat_cache_writePartialSector(cache, buffer, sector, 0, cache->bytesPerSector);
 }
 
-bool _FAT_cache_writeSectors(CACHE* cache, sec_t sector, sec_t numSectors, const void* buffer);
+bool fat_cache_writeSectors(CACHE* cache, sec_t sector, sec_t numSectors, const void* buffer);
 
 /*
 Write any dirty sectors back to disc and clear out the contents of the cache
 */
-bool _FAT_cache_flush(CACHE* cache);
+bool fat_cache_flush(CACHE* cache);
 
 /*
 Clear out the contents of the cache without writing any dirty sectors first
 */
-void _FAT_cache_invalidate(CACHE* cache);
+void fat_cache_invalidate(CACHE* cache);
 
-CACHE* _FAT_cache_constructor(
-    unsigned int numberOfPages, unsigned int sectorsPerPage, DISC_INTERFACE* discInterface,
-    sec_t endOfPartition, unsigned int bytesPerSector
+CACHE* fat_cache_constructor(
+    uint32_t numberOfPages, uint32_t sectorsPerPage, DISC_INTERFACE* discInterface,
+    sec_t endOfPartition, uint32_t bytesPerSector
 );
 
-void _FAT_cache_destructor(CACHE* cache);
-
-#endif // _CACHE_H
+void fat_cache_destructor(CACHE* cache);

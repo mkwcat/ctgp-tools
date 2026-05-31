@@ -38,19 +38,18 @@
 #include "bit_ops.h"
 #include "common.h"
 #include "disc.h"
-#include "file_allocation_table.h"
 #include "mem_allocate.h"
 #include <limits.h>
 #include <string.h>
 
 #define CACHE_FREE UINT_MAX
 
-CACHE* _FAT_cache_constructor(
-    unsigned int numberOfPages, unsigned int sectorsPerPage, DISC_INTERFACE* discInterface,
-    sec_t endOfPartition, unsigned int bytesPerSector
+CACHE* fat_cache_constructor(
+    uint32_t numberOfPages, uint32_t sectorsPerPage, DISC_INTERFACE* discInterface,
+    sec_t endOfPartition, uint32_t bytesPerSector
 ) {
     CACHE*       cache;
-    unsigned int i;
+    uint32_t     i;
     CACHE_ENTRY* cacheEntries;
 
     if (numberOfPages < 2) {
@@ -61,7 +60,7 @@ CACHE* _FAT_cache_constructor(
         sectorsPerPage = 8;
     }
 
-    cache = (CACHE*) _FAT_mem_allocate(sizeof(CACHE));
+    cache = (CACHE*) fat_mem_allocate(sizeof(CACHE));
     if (cache == NULL) {
         return NULL;
     }
@@ -72,9 +71,9 @@ CACHE* _FAT_cache_constructor(
     cache->sectorsPerPage = sectorsPerPage;
     cache->bytesPerSector = bytesPerSector;
 
-    cacheEntries          = (CACHE_ENTRY*) _FAT_mem_allocate(sizeof(CACHE_ENTRY) * numberOfPages);
+    cacheEntries          = (CACHE_ENTRY*) fat_mem_allocate(sizeof(CACHE_ENTRY) * numberOfPages);
     if (cacheEntries == NULL) {
-        _FAT_mem_free(cache);
+        fat_mem_free(cache);
         return NULL;
     }
 
@@ -83,7 +82,7 @@ CACHE* _FAT_cache_constructor(
         cacheEntries[i].count       = 0;
         cacheEntries[i].last_access = 0;
         cacheEntries[i].dirty       = false;
-        cacheEntries[i].cache       = (uint8_t*) _FAT_mem_align(sectorsPerPage * bytesPerSector);
+        cacheEntries[i].cache       = (uint8_t*) fat_mem_align(sectorsPerPage * bytesPerSector);
     }
 
     cache->cacheEntries = cacheEntries;
@@ -91,39 +90,41 @@ CACHE* _FAT_cache_constructor(
     return cache;
 }
 
-void _FAT_cache_destructor(
+void fat_cache_destructor(
     CACHE* cache
 ) {
-    unsigned int i;
+    uint32_t i;
     // Clear out cache before destroying it
-    _FAT_cache_flush(cache);
+    fat_cache_flush(cache);
 
     // Free memory in reverse allocation order
     for (i = 0; i < cache->numberOfPages; i++) {
-        _FAT_mem_free(cache->cacheEntries[i].cache);
+        fat_mem_free(cache->cacheEntries[i].cache);
     }
-    _FAT_mem_free(cache->cacheEntries);
-    _FAT_mem_free(cache);
+    fat_mem_free(cache->cacheEntries);
+    fat_mem_free(cache);
 }
 
 static uint32_t accessCounter = 0;
 
-static uint32_t accessTime() {
+static uint32_t accessTime(
+    void
+) {
     accessCounter++;
     return accessCounter;
 }
 
-static CACHE_ENTRY* _FAT_cache_getPage(
+static CACHE_ENTRY* fat_cache_getPage(
     CACHE* cache, sec_t sector
 ) {
-    unsigned int i;
+    uint32_t     i;
     CACHE_ENTRY* cacheEntries   = cache->cacheEntries;
-    unsigned int numberOfPages  = cache->numberOfPages;
-    unsigned int sectorsPerPage = cache->sectorsPerPage;
+    uint32_t     numberOfPages  = cache->numberOfPages;
+    uint32_t     sectorsPerPage = cache->sectorsPerPage;
 
     bool         foundFree      = false;
-    unsigned int oldUsed        = 0;
-    unsigned int oldAccess      = UINT_MAX;
+    uint32_t     oldUsed        = 0;
+    uint32_t     oldAccess      = UINT_MAX;
 
     for (i = 0; i < numberOfPages; i++) {
         if (sector >= cacheEntries[i].sector &&
@@ -143,7 +144,7 @@ static CACHE_ENTRY* _FAT_cache_getPage(
     }
 
     if (foundFree == false && cacheEntries[oldUsed].dirty == true) {
-        if (!_FAT_disc_writeSectors(
+        if (!fat_disc_writeSectors(
                 cache->disc, cacheEntries[oldUsed].sector, cacheEntries[oldUsed].count,
                 cacheEntries[oldUsed].cache
             )) {
@@ -158,7 +159,7 @@ static CACHE_ENTRY* _FAT_cache_getPage(
         next_page = cache->endOfPartition;
     }
 
-    if (!_FAT_disc_readSectors(
+    if (!fat_disc_readSectors(
             cache->disc, sector, next_page - sector, cacheEntries[oldUsed].cache
         )) {
         return NULL;
@@ -171,7 +172,7 @@ static CACHE_ENTRY* _FAT_cache_getPage(
     return &(cacheEntries[oldUsed]);
 }
 
-bool _FAT_cache_readSectors(
+bool fat_cache_readSectors(
     CACHE* cache, sec_t sector, sec_t numSectors, void* buffer
 ) {
     sec_t        sec;
@@ -180,7 +181,7 @@ bool _FAT_cache_readSectors(
     uint8_t*     dest = (uint8_t*) buffer;
 
     while (numSectors > 0) {
-        entry = _FAT_cache_getPage(cache, sector);
+        entry = fat_cache_getPage(cache, sector);
         if (entry == NULL) {
             return false;
         }
@@ -207,8 +208,8 @@ bool _FAT_cache_readSectors(
 /*
 Reads some data from a cache page, determined by the sector number
 */
-bool _FAT_cache_readPartialSector(
-    CACHE* cache, void* buffer, sec_t sector, unsigned int offset, size_t size
+bool fat_cache_readPartialSector(
+    CACHE* cache, void* buffer, sec_t sector, uint32_t offset, size_t size
 ) {
     sec_t        sec;
     CACHE_ENTRY* entry;
@@ -217,7 +218,7 @@ bool _FAT_cache_readPartialSector(
         return false;
     }
 
-    entry = _FAT_cache_getPage(cache, sector);
+    entry = fat_cache_getPage(cache, sector);
     if (entry == NULL) {
         return false;
     }
@@ -228,11 +229,11 @@ bool _FAT_cache_readPartialSector(
     return true;
 }
 
-bool _FAT_cache_readLittleEndianValue(
-    CACHE* cache, uint32_t* value, sec_t sector, unsigned int offset, int num_bytes
+bool fat_cache_readLittleEndianValue(
+    CACHE* cache, uint32_t* value, sec_t sector, uint32_t offset, int32_t num_bytes
 ) {
     uint8_t buf[4];
-    if (!_FAT_cache_readPartialSector(cache, buf, sector, offset, num_bytes)) {
+    if (!fat_cache_readPartialSector(cache, buf, sector, offset, num_bytes)) {
         return false;
     }
 
@@ -255,8 +256,8 @@ bool _FAT_cache_readLittleEndianValue(
 /*
 Writes some data to a cache page, making sure it is loaded into memory first.
 */
-bool _FAT_cache_writePartialSector(
-    CACHE* cache, const void* buffer, sec_t sector, unsigned int offset, size_t size
+bool fat_cache_writePartialSector(
+    CACHE* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
 ) {
     sec_t        sec;
     CACHE_ENTRY* entry;
@@ -265,7 +266,7 @@ bool _FAT_cache_writePartialSector(
         return false;
     }
 
-    entry = _FAT_cache_getPage(cache, sector);
+    entry = fat_cache_getPage(cache, sector);
     if (entry == NULL) {
         return false;
     }
@@ -277,17 +278,17 @@ bool _FAT_cache_writePartialSector(
     return true;
 }
 
-bool _FAT_cache_writeLittleEndianValue(
-    CACHE* cache, const uint32_t value, sec_t sector, unsigned int offset, int size
+bool fat_cache_writeLittleEndianValue(
+    CACHE* cache, const uint32_t value, sec_t sector, uint32_t offset, int32_t size
 ) {
     uint8_t buf[4] = {0, 0, 0, 0};
 
     switch (size) {
     case 1:
-        buf[0] = value;
+        buf[0] = value & 0xFF;
         break;
     case 2:
-        u16_to_u8array(buf, 0, value);
+        u16_to_u8array(buf, 0, value & 0xFFFF);
         break;
     case 4:
         u32_to_u8array(buf, 0, value);
@@ -296,14 +297,14 @@ bool _FAT_cache_writeLittleEndianValue(
         return false;
     }
 
-    return _FAT_cache_writePartialSector(cache, buf, sector, offset, size);
+    return fat_cache_writePartialSector(cache, buf, sector, offset, size);
 }
 
 /*
 Writes some data to a cache page, zeroing out the page first
 */
-bool _FAT_cache_eraseWritePartialSector(
-    CACHE* cache, const void* buffer, sec_t sector, unsigned int offset, size_t size
+bool fat_cache_eraseWritePartialSector(
+    CACHE* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
 ) {
     sec_t        sec;
     CACHE_ENTRY* entry;
@@ -312,7 +313,7 @@ bool _FAT_cache_eraseWritePartialSector(
         return false;
     }
 
-    entry = _FAT_cache_getPage(cache, sector);
+    entry = fat_cache_getPage(cache, sector);
     if (entry == NULL) {
         return false;
     }
@@ -325,7 +326,7 @@ bool _FAT_cache_eraseWritePartialSector(
     return true;
 }
 
-bool _FAT_cache_writeSectors(
+bool fat_cache_writeSectors(
     CACHE* cache, sec_t sector, sec_t numSectors, const void* buffer
 ) {
     sec_t          sec;
@@ -334,7 +335,7 @@ bool _FAT_cache_writeSectors(
     const uint8_t* src = (const uint8_t*) buffer;
 
     while (numSectors > 0) {
-        entry = _FAT_cache_getPage(cache, sector);
+        entry = fat_cache_getPage(cache, sector);
         if (entry == NULL) {
             return false;
         }
@@ -362,14 +363,14 @@ bool _FAT_cache_writeSectors(
 /*
 Flushes all dirty pages to disc, clearing the dirty flag.
 */
-bool _FAT_cache_flush(
+bool fat_cache_flush(
     CACHE* cache
 ) {
-    unsigned int i;
+    uint32_t i;
 
     for (i = 0; i < cache->numberOfPages; i++) {
         if (cache->cacheEntries[i].dirty) {
-            if (!_FAT_disc_writeSectors(
+            if (!fat_disc_writeSectors(
                     cache->disc, cache->cacheEntries[i].sector, cache->cacheEntries[i].count,
                     cache->cacheEntries[i].cache
                 )) {
@@ -382,11 +383,11 @@ bool _FAT_cache_flush(
     return true;
 }
 
-void _FAT_cache_invalidate(
+void fat_cache_invalidate(
     CACHE* cache
 ) {
-    unsigned int i;
-    _FAT_cache_flush(cache);
+    uint32_t i;
+    fat_cache_flush(cache);
     for (i = 0; i < cache->numberOfPages; i++) {
         cache->cacheEntries[i].sector      = CACHE_FREE;
         cache->cacheEntries[i].last_access = 0;

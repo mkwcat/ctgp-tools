@@ -28,24 +28,21 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _FATFILE_H
-#define _FATFILE_H
+#pragma once
 
 #include "common.h"
 #include "directory.h"
 #include "partition.h"
 
-#define FILE_MAX_SIZE ((uint32_t) 0xFFFFFFFF) // 4GiB - 1B
+static const uint32_t FILE_MAX_SIZE = 0xFFFFFFFFu; // 4GiB - 1B
 
-typedef struct {
+typedef struct FILE_POSITION {
     uint32_t cluster;
     sec_t    sector;
-    int32_t  byte;
+    uint32_t byte;
 } FILE_POSITION;
 
-struct _FILE_STRUCT;
-
-struct _FILE_STRUCT {
+typedef struct FILE_STRUCT {
     uint32_t      filesize;
     uint32_t      startCluster;
     uint32_t      currentPosition;
@@ -53,48 +50,49 @@ struct _FILE_STRUCT {
     FILE_POSITION appendPosition;
     DIR_ENTRY_POSITION
     dirEntryStart; // Points to the start of the LFN entries of a file, or the alias for no LFN
-    DIR_ENTRY_POSITION   dirEntryEnd; // Always points to the file's alias entry
-    PARTITION*           partition;
-    struct _FILE_STRUCT* prevOpenFile; // The previous entry in a double-linked list of open files
-    struct _FILE_STRUCT* nextOpenFile; // The next entry in a double-linked list of open files
-    bool                 read;
-    bool                 write;
-    bool                 append;
-    bool                 inUse;
-    bool                 modified;
-};
+    DIR_ENTRY_POSITION  dirEntryEnd; // Always points to the file's alias entry
+    PARTITION*          partition;
+    struct FILE_STRUCT* prevOpenFile; // The previous entry in a double-linked list of open files
+    struct FILE_STRUCT* nextOpenFile; // The next entry in a double-linked list of open files
+    bool                read;
+    bool                write;
+    bool                append;
+    bool                inUse;
+    bool                modified;
+} FILE_STRUCT;
 
-typedef struct _FILE_STRUCT FILE_STRUCT;
+FILE_STRUCT*
+fat_open_r(struct fat_reent* r, FILE_STRUCT* fileStruct, const char* path, int32_t flags);
 
-FILE_STRUCT* _FAT_open_r(struct _reent* r, FILE_STRUCT* fileStruct, const char* path, int flags, int mode);
+int32_t fat_close_r(struct fat_reent* r, void* fd);
 
-int _FAT_close_r(struct _reent* r, void* fd);
+int32_t fat_write_r(struct fat_reent* r, void* fd, const char* ptr, uint32_t len);
 
-ptrdiff_t _FAT_write_r(struct _reent* r, void* fd, const char* ptr, size_t len);
+int32_t fat_read_r(struct fat_reent* r, void* fd, char* ptr, uint32_t len);
 
-ptrdiff_t _FAT_read_r(struct _reent* r, void* fd, char* ptr, size_t len);
+fat_off_t fat_seek_r(struct fat_reent* r, void* fd, fat_off_t pos, int32_t dir);
 
-_FAT_off_t _FAT_seek_r(struct _reent* r, void* fd, _FAT_off_t pos, int dir);
+int32_t fat_fstat_r(struct fat_reent* r, void* fd, struct fat_stat* st);
 
-int _FAT_fstat_r(struct _reent* r, void* fd, struct _FAT_stat* st);
+int32_t fat_stat_r(struct fat_reent* r, const char* path, struct fat_stat* st);
 
-int _FAT_stat_r(struct _reent* r, const char* path, struct _FAT_stat* st);
+int32_t fat_link_r(struct fat_reent* r, const char* existing, const char* newLink);
 
-int _FAT_link_r(struct _reent* r, const char* existing, const char* newLink);
+int32_t fat_chdir_r(struct fat_reent* r, const char* name);
 
-int _FAT_chdir_r(struct _reent* r, const char* name);
+int32_t fat_rename_r(struct fat_reent* r, const char* oldName, const char* newName);
 
-int _FAT_rename_r(struct _reent* r, const char* oldName, const char* newName);
+int32_t fat_ftruncate_r(struct fat_reent* r, void* fd, fat_off_t len);
 
-int _FAT_ftruncate_r(struct _reent* r, void* fd, _FAT_off_t len);
+int32_t fat_fsync_r(struct fat_reent* r, void* fd);
 
-int _FAT_fsync_r(struct _reent* r, void* fd);
+int32_t fat_getAttr(const char* file);
+
+int32_t fat_setAttr(const char* file, uint8_t attr);
 
 /*
 Synchronizes the file data to disc.
 Does no locking of its own -- lock the partition before calling.
 Returns 0 on success, an error code on failure.
 */
-extern int _FAT_syncToDisc(FILE_STRUCT* file);
-
-#endif // _FATFILE_H
+int32_t fat_syncToDisc(FILE_STRUCT* file);

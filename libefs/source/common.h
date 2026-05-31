@@ -26,64 +26,77 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _COMMON_H
-#define _COMMON_H
+#pragma once
 
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <time.h>
 
-typedef struct DISC_INTERFACE DISC_INTERFACE;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-typedef uint32_t              sec_t;
-typedef uint32_t              _FAT_off_t;
-typedef int                   _FAT_ino_t;
+typedef uint32_t sec_t;
+typedef uint32_t fat_off_t;
+typedef int32_t  fat_ino_t;
 
 typedef struct {
-    int   device;
-    void* dirStruct;
+    int32_t device;
+    void*   dirStruct;
 } DIR_ITER;
 
-struct _FAT_stat {
-    int32_t  st_dev;
-    int      st_ino;
-    uint32_t st_size;
-    uint32_t st_mode;
-    time_t   st_atime;
-    time_t   st_mtime;
-    time_t   st_ctime;
-    int32_t  st_blocks;
-    int32_t  st_blksize;
+struct fat_stat {
+    int32_t   st_dev;
+    fat_ino_t st_ino;
+    uint32_t  st_size;
+    uint32_t  st_mode;
+    time_t    st_atime;
+    time_t    st_mtime;
+    time_t    st_ctime;
+    int32_t   st_blocks;
+    int32_t   st_blksize;
 };
 
-struct _reent {
+struct fat_reent {
     int _errno;
 };
 
-#define _FAT_S_IFDIR (1u << 0)
-#define _FAT_S_IFREG (1u << 1)
-#define _FAT_S_IRUSR (1u << 2)
-#define _FAT_S_IRGRP (1u << 3)
-#define _FAT_S_IROTH (1u << 4)
-#define _FAT_S_IWUSR (1u << 5)
-#define _FAT_S_IWGRP (1u << 6)
-#define _FAT_S_IWOTH (1u << 7)
+enum {
+    fat_S_IFDIR = (1u << 0),
+    fat_S_IFREG = (1u << 1),
+    fat_S_IRUSR = (1u << 2),
+    fat_S_IRGRP = (1u << 3),
+    fat_S_IROTH = (1u << 4),
+    fat_S_IWUSR = (1u << 5),
+    fat_S_IWGRP = (1u << 6),
+    fat_S_IWOTH = (1u << 7),
+};
 
-#define NAME_MAX 1024
+enum {
+    fat_NAME_MAX = 1024,
+};
 
 // File attributes
-#define ATTR_ARCHIVE 0x20   // Archive
-#define ATTR_DIRECTORY 0x10 // Directory
-#define ATTR_VOLUME 0x08    // Volume
-#define ATTR_SYSTEM 0x04    // System
-#define ATTR_HIDDEN 0x02    // Hidden
-#define ATTR_READONLY 0x01  // Read only
+enum {
+    fat_ATTR_ARCHIVE   = 0x20, // Archive
+    fat_ATTR_DIRECTORY = 0x10, // Directory
+    fat_ATTR_VOLUME    = 0x08, // Volume
+    fat_ATTR_SYSTEM    = 0x04, // System
+    fat_ATTR_HIDDEN    = 0x02, // Hidden
+    fat_ATTR_READONLY  = 0x01, // Read only
+};
 
-static const unsigned FEATURE_MEDIUM_CANWRITE = 1;
+enum {
+    fat_FEATURE_MEDIUM_CANWRITE = 1,
+};
 
-#define DEFAULT_CACHE_PAGES 4
-#define DEFAULT_SECTORS_PAGE 64
-#define USE_RTC_TIME
+enum {
+    fat_DEFAULT_CACHE_PAGES  = 4,
+    fat_DEFAULT_SECTORS_PAGE = 64,
+};
 
-#endif // _COMMON_H
+#ifdef __cplusplus
+} // extern "C"
+#endif

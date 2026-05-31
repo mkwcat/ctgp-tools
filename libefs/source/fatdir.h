@@ -28,9 +28,6 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _FATDIR_H
-#define _FATDIR_H
-
 #include "common.h"
 #include "directory.h"
 
@@ -42,31 +39,29 @@ typedef struct {
     bool       validEntry;
 } DIR_STATE_STRUCT;
 
-extern int _FAT_stat_r(struct _reent* r, const char* path, struct _FAT_stat* st);
+extern int fat_stat_r(struct fat_reent* r, const char* path, struct fat_stat* st);
 
-extern int _FAT_link_r(struct _reent* r, const char* existing, const char* newLink);
+extern int fat_link_r(struct fat_reent* r, const char* existing, const char* newLink);
 
-extern int _FAT_unlink_r(struct _reent* r, const char* name);
+extern int fat_unlink_r(struct fat_reent* r, const char* name);
 
-extern int _FAT_chdir_r(struct _reent* r, const char* name);
+extern int fat_chdir_r(struct fat_reent* r, const char* name);
 
-extern int _FAT_rename_r(struct _reent* r, const char* oldName, const char* newName);
+extern int fat_rename_r(struct fat_reent* r, const char* oldName, const char* newName);
 
-extern int _FAT_mkdir_r(struct _reent* r, const char* path, int mode);
+extern int fat_mkdir_r(struct fat_reent* r, const char* path);
 
-extern int _FAT_rmdir_r(struct _reent* r, const char* path);
+extern int fat_rmdir_r(struct fat_reent* r, const char* path);
 
 #if 0
-extern int _FAT_statvfs_r(struct _reent* r, const char* path, struct statvfs* buf);
+extern int fat_statvfs_r(struct fat_reent* r, const char* path, struct statvfs* buf);
 #endif
 
 /*
 Directory iterator functions
 */
-extern DIR_ITER* _FAT_diropen_r(struct _reent* r, DIR_ITER* dirState, const char* path);
-extern int _FAT_dirreset_r(struct _reent* r, DIR_ITER* dirState);
+extern DIR_ITER* fat_diropen_r(struct fat_reent* r, DIR_ITER* dirState, const char* path);
+extern int fat_dirreset_r(struct fat_reent* r, DIR_ITER* dirState);
 extern int
-_FAT_dirnext_r(struct _reent* r, DIR_ITER* dirState, char* filename, struct _FAT_stat* filestat);
-extern int _FAT_dirclose_r(struct _reent* r, DIR_ITER* dirState);
-
-#endif // _FATDIR_H
+fat_dirnext_r(struct fat_reent* r, DIR_ITER* dirState, char* filename, struct fat_stat* filestat);
+extern int fat_dirclose_r(struct fat_reent* r, DIR_ITER* dirState);

@@ -28,27 +28,10 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _MEM_ALLOCATE_H
-#define _MEM_ALLOCATE_H
+#pragma once
 
 #include <stdlib.h>
 
-static inline void* _FAT_mem_allocate(
-    size_t size
-) {
-    return malloc(size);
-}
-
-static inline void* _FAT_mem_align(
-    size_t size
-) {
-    return malloc(size);
-}
-
-static inline void _FAT_mem_free(
-    void* mem
-) {
-    free(mem);
-}
-
-#endif // _MEM_ALLOCATE_H
+#define fat_mem_allocate(size) malloc(size)
+#define fat_mem_align(size) malloc(size)
+#define fat_mem_free(ptr) free(ptr)

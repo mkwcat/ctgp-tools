@@ -28,7 +28,6 @@
 
 #include "filetime.h"
 
-#include "common.h"
 #include <time.h>
 
 #define MAX_HOUR 23
@@ -40,7 +39,7 @@
 #define MAX_DAY 31
 #define MIN_DAY 1
 
-static struct tm* _FAT_localtime_r(
+static struct tm* fat_localtime_r(
     const time_t* timer, struct tm* result
 ) {
 #if defined(_WIN32) || defined(_WIN64)
@@ -53,17 +52,16 @@ static struct tm* _FAT_localtime_r(
 #endif
 }
 
-uint16_t _FAT_filetime_getTimeFromRTC(
+uint16_t fat_filetime_getTimeFromRTC(
     void
 ) {
-#ifdef USE_RTC_TIME
     struct tm timeParts;
     time_t    epochTime;
 
     if (time(&epochTime) == (time_t) -1) {
         return 0;
     }
-    _FAT_localtime_r(&epochTime, &timeParts);
+    fat_localtime_r(&epochTime, &timeParts);
 
     // Check that the values are all in range.
     // If they are not, return 0 (no timestamp)
@@ -77,26 +75,20 @@ uint16_t _FAT_filetime_getTimeFromRTC(
         return 0;
     }
 
-    return (
-        ((timeParts.tm_hour & 0x1F) << 11) | ((timeParts.tm_min & 0x3F) << 5) |
-        ((timeParts.tm_sec >> 1) & 0x1F)
-    );
-#else
-    return 0;
-#endif
+    return (uint16_t) (((timeParts.tm_hour & 0x1F) << 11) | ((timeParts.tm_min & 0x3F) << 5) |
+                       ((timeParts.tm_sec >> 1) & 0x1F));
 }
 
-uint16_t _FAT_filetime_getDateFromRTC(
+uint16_t fat_filetime_getDateFromRTC(
     void
 ) {
-#ifdef USE_RTC_TIME
     struct tm timeParts;
     time_t    epochTime;
 
     if (time(&epochTime) == (time_t) -1) {
         return 0;
     }
-    _FAT_localtime_r(&epochTime, &timeParts);
+    fat_localtime_r(&epochTime, &timeParts);
 
     if ((timeParts.tm_mon < MIN_MONTH) || (timeParts.tm_mon > MAX_MONTH)) {
         return 0;
@@ -105,18 +97,13 @@ uint16_t _FAT_filetime_getDateFromRTC(
         return 0;
     }
 
-    return (
-        (((timeParts.tm_year - 80) & 0x7F)
-         << 9) | // Adjust for MS-FAT base year (1980 vs 1900 for tm_year)
-        (((timeParts.tm_mon + 1) & 0xF) << 5) |
-        (timeParts.tm_mday & 0x1F)
-    );
-#else
-    return 0;
-#endif
+    return (uint16_t) ((((timeParts.tm_year - 80) & 0x7F)
+                        << 9) | // Adjust for MS-FAT base year (1980 vs 1900 for tm_year)
+                       (((timeParts.tm_mon + 1) & 0xF) << 5) |
+                       (timeParts.tm_mday & 0x1F));
 }
 
-time_t _FAT_filetime_to_time_t(
+time_t fat_filetime_to_time_t(
     uint16_t t, uint16_t d
 ) {
     struct tm timeParts;

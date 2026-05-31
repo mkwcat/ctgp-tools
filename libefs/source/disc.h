@@ -26,10 +26,12 @@
  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-#ifndef _DISC_H
-#define _DISC_H
+
+#pragma once
 
 #include "common.h"
+
+typedef struct DISC_INTERFACE DISC_INTERFACE;
 
 enum EFS_TYPE {
     EFS_TYPE_EFA,
@@ -39,21 +41,22 @@ enum EFS_TYPE {
 /*
 Create an EFS disc with the type
 */
-DISC_INTERFACE* _FAT_efs_disc_create(const char* path, enum EFS_TYPE type);
+DISC_INTERFACE* fat_efs_disc_create(const char* path, enum EFS_TYPE type);
 
 /*
-Destroy an EFS disc created with _FAT_efs_create
+Destroy an EFS disc created with fat_efs_create
 */
-void _FAT_efs_disc_destroy(DISC_INTERFACE* disc);
-
+void fat_efs_disc_destroy(DISC_INTERFACE* disc);
 
 /*
 Check if a disc is inserted
 Return true if a disc is inserted and ready, false otherwise
 */
-static inline bool _FAT_disc_isInserted(
+static inline bool fat_disc_isInserted(
     DISC_INTERFACE* disc
 ) {
+    (void) disc;
+
     return true;
 }
 
@@ -64,7 +67,7 @@ else it is at least 1
 sector is 0 or greater
 buffer is a pointer to the memory to fill
 */
-bool _FAT_disc_readSectors(DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, void* buffer);
+bool fat_disc_readSectors(DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, void* buffer);
 
 /*
 Write numSectors sectors to a disc, starting at sector.
@@ -73,25 +76,29 @@ else it is at least 1
 sector is 0 or greater
 buffer is a pointer to the memory to read from
 */
-bool _FAT_disc_writeSectors(
+bool fat_disc_writeSectors(
     DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, const void* buffer
 );
 
 /*
 Reset the card back to a ready state
 */
-static inline bool _FAT_disc_clearStatus(
+static inline bool fat_disc_clearStatus(
     DISC_INTERFACE* disc
 ) {
+    (void) disc;
+
     return true;
 }
 
 /*
 Initialise the disc to a state ready for data reading or writing
 */
-static inline bool _FAT_disc_startup(
+static inline bool fat_disc_startup(
     DISC_INTERFACE* disc
 ) {
+    (void) disc;
+
     return true;
 }
 
@@ -99,28 +106,32 @@ static inline bool _FAT_disc_startup(
 Put the disc in a state ready for power down.
 Complete any pending writes and disable the disc if necessary
 */
-static inline bool _FAT_disc_shutdown(
+static inline bool fat_disc_shutdown(
     DISC_INTERFACE* disc
 ) {
+    (void) disc;
+
     return true;
 }
 
 /*
 Return a 32 bit value unique to each type of interface
 */
-static inline uint32_t _FAT_disc_hostType(
+static inline uint32_t fat_disc_hostType(
     DISC_INTERFACE* disc
 ) {
+    (void) disc;
+
     return 0;
 }
 
 /*
 Return a 32 bit value that specifies the capabilities of the disc
 */
-static inline uint32_t _FAT_disc_features(
+static inline uint32_t fat_disc_features(
     DISC_INTERFACE* disc
 ) {
-    return FEATURE_MEDIUM_CANWRITE;
-}
+    (void) disc;
 
-#endif // _DISC_H
+    return fat_FEATURE_MEDIUM_CANWRITE;
+}

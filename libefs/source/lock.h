@@ -30,7 +30,7 @@
 
 typedef int mutex_t;
 
-void _FAT_lock_init(mutex_t* mutex);
-void _FAT_lock_deinit(mutex_t* mutex);
-void _FAT_lock(mutex_t* mutex);
-void _FAT_unlock(mutex_t* mutex);
+void fat_lock_init(mutex_t* mutex);
+void fat_lock_deinit(mutex_t* mutex);
+void fat_lock(mutex_t* mutex);
+void fat_unlock(mutex_t* mutex);

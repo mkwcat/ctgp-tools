@@ -27,16 +27,17 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef _PARTITION_H
-#define _PARTITION_H
+#pragma once
 
 #include "cache.h"
 #include "common.h"
-#include "lock.h"
 #include "disc.h"
+#include "lock.h"
 
-#define MIN_SECTOR_SIZE 512
-#define MAX_SECTOR_SIZE 4096
+enum {
+    MIN_SECTOR_SIZE = 512,
+    MAX_SECTOR_SIZE = 4096,
+};
 
 // Filesystem type
 typedef enum {
@@ -71,18 +72,18 @@ typedef struct {
     uint32_t fsInfoSector;
     FAT      fat;
     // Values that may change after construction
-    uint32_t             cwdCluster; // Current working directory cluster
-    int                  openFileCount;
-    struct _FILE_STRUCT* firstOpenFile; // The start of a linked list of files
-    mutex_t              lock;          // A lock for partition operations
-    bool                 readOnly;      // If this is set, then do not try writing to the disc
-    char                 label[12];     // Volume label
+    uint32_t            cwdCluster; // Current working directory cluster
+    int                 openFileCount;
+    struct FILE_STRUCT* firstOpenFile; // The start of a linked list of files
+    mutex_t             lock;          // A lock for partition operations
+    bool                readOnly;      // If this is set, then do not try writing to the disc
+    char                label[12];     // Volume label
 } PARTITION;
 
 /*
 Mount the supplied device and return a pointer to the struct necessary to use it
 */
-PARTITION* _FAT_partition_constructor(
+PARTITION* fat_partition_constructor(
     DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t SectorsPerPage, sec_t startSector
 );
 
@@ -90,31 +91,29 @@ PARTITION* _FAT_partition_constructor(
 Dismount the device and free all structures used.
 Will also attempt to synchronise all open files to disc.
 */
-void _FAT_partition_destructor(PARTITION* partition);
+void fat_partition_destructor(PARTITION* partition);
 
 /*
 Return the partition specified in a path, as taken from the devoptab.
 */
-PARTITION* _FAT_partition_getPartitionFromPath(const char* path);
+PARTITION* fat_partition_getPartitionFromPath(const char* path);
 
 /*
 Create the fs info sector.
 */
-void _FAT_partition_createFSinfo(PARTITION* partition);
+void fat_partition_createFSinfo(PARTITION* partition);
 
 /*
 Read the fs info sector data.
 */
-void _FAT_partition_readFSinfo(PARTITION* partition);
+void fat_partition_readFSinfo(PARTITION* partition);
 
 /*
 Write the fs info sector data.
 */
-void _FAT_partition_writeFSinfo(PARTITION* partition);
+void fat_partition_writeFSinfo(PARTITION* partition);
 
 /*
 Create a partition and disc for the specified EFS type.
 */
-PARTITION* _FAT_efs_partition_create(const char* path, enum EFS_TYPE type);
-
-#endif // _PARTITION_H
+PARTITION* fat_efs_partition_create(const char* path, enum EFS_TYPE type);
