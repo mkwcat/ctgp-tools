@@ -37,6 +37,7 @@
 #include "file_allocation_table.h"
 #include "filetime.h"
 #include "lock.h"
+#include "partition.h"
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -46,8 +47,8 @@
 static bool fat_findEntry(
     const char* path, DIR_ENTRY* dirEntry
 ) {
-    bool       r;
-    PARTITION* partition = fat_partition_getPartitionFromPath(path);
+    bool           r;
+    fat_partition* partition = fat_partition_getPartitionFromPath(path);
 
     // Check Partition
     if (!partition) {
@@ -86,7 +87,7 @@ int32_t fat_setAttr(
 ) {
     // Defines...
     DIR_ENTRY_POSITION entryEnd;
-    PARTITION*         partition = NULL;
+    fat_partition*     partition = NULL;
     DIR_ENTRY          dirEntry;
 
     // Get Partition
@@ -142,16 +143,16 @@ int32_t fat_setAttr(
     return 0;
 }
 
-FILE_STRUCT* fat_open_r(
-    struct fat_reent* r, FILE_STRUCT* fileStruct, const char* path, int32_t flags
+fat_file* fat_open_r(
+    struct fat_reent* r, fat_file* fileStruct, const char* path, int32_t flags
 ) {
-    PARTITION*   partition = NULL;
-    bool         fileExists;
-    DIR_ENTRY    dirEntry;
-    const char*  pathEnd;
-    uint32_t     dirCluster;
-    FILE_STRUCT* file = (FILE_STRUCT*) fileStruct;
-    partition         = fat_partition_getPartitionFromPath(path);
+    fat_partition* partition = NULL;
+    bool           fileExists;
+    DIR_ENTRY      dirEntry;
+    const char*    pathEnd;
+    uint32_t       dirCluster;
+    fat_file*      file = (fat_file*) fileStruct;
+    partition           = fat_partition_getPartitionFromPath(path);
 
     if (partition == NULL) {
         r->_errno = ENODEV;
@@ -357,7 +358,7 @@ Does no locking of its own -- lock the partition before calling.
 Returns 0 on success, an error code on failure.
 */
 int32_t fat_syncToDisc(
-    FILE_STRUCT* file
+    fat_file* file
 ) {
     uint8_t dirEntryData[DIR_ENTRY_DATA_SIZE];
 
@@ -414,8 +415,8 @@ int32_t fat_syncToDisc(
 int32_t fat_close_r(
     struct fat_reent* r, void* fd
 ) {
-    FILE_STRUCT* file = (FILE_STRUCT*) fd;
-    int32_t      ret  = 0;
+    fat_file* file = (fat_file*) fd;
+    int32_t   ret  = 0;
 
     if (!file->inUse) {
         r->_errno = EBADF;
@@ -453,14 +454,14 @@ int32_t fat_close_r(
 int32_t fat_read_r(
     struct fat_reent* r, void* fd, char* ptr, uint32_t len
 ) {
-    FILE_STRUCT*  file = (FILE_STRUCT*) fd;
-    PARTITION*    partition;
-    CACHE*        cache;
-    FILE_POSITION position;
-    uint32_t      tempNextCluster;
-    uint32_t      tempVar;
-    uint32_t      remain;
-    bool          flagNoError = true;
+    fat_file*         file = (fat_file*) fd;
+    fat_partition*    partition;
+    fat_cache*        cache;
+    fat_file_position position;
+    uint32_t          tempNextCluster;
+    uint32_t          tempVar;
+    uint32_t          remain;
+    bool              flagNoError = true;
 
     // Short circuit cases where len is 0 (or less)
     if (len <= 0) {
@@ -635,7 +636,7 @@ int32_t fat_read_r(
 // this solves the over-allocation problems when file size is aligned to cluster size
 // return true on succes, false on error
 static bool fat_check_position_for_next_cluster(
-    struct fat_reent* r, FILE_POSITION* position, PARTITION* partition, uint32_t remain,
+    struct fat_reent* r, fat_file_position* position, fat_partition* partition, uint32_t remain,
     bool* flagNoError
 ) {
     uint32_t tempNextCluster;
@@ -678,12 +679,12 @@ err:
 Extend a file so that the size is the same as the rwPosition
 */
 static bool fat_file_extend_r(
-    struct fat_reent* r, FILE_STRUCT* file
+    struct fat_reent* r, fat_file* file
 ) {
-    PARTITION*    partition = file->partition;
-    CACHE*        cache     = file->partition->cache;
-    FILE_POSITION position;
-    uint8_t       zeroBuffer[partition->bytesPerSector];
+    fat_partition*    partition = file->partition;
+    fat_cache*        cache     = file->partition->cache;
+    fat_file_position position;
+    uint8_t           zeroBuffer[MAX_SECTOR_SIZE];
     memset(zeroBuffer, 0, partition->bytesPerSector);
     uint32_t remain;
     uint32_t tempNextCluster;
@@ -771,15 +772,15 @@ static bool fat_file_extend_r(
 int32_t fat_write_r(
     struct fat_reent* r, void* fd, const char* ptr, uint32_t len
 ) {
-    FILE_STRUCT*  file = (FILE_STRUCT*) fd;
-    PARTITION*    partition;
-    CACHE*        cache;
-    FILE_POSITION position;
-    uint32_t      tempNextCluster;
-    uint32_t      tempVar;
-    uint32_t      remain;
-    bool          flagNoError   = true;
-    bool          flagAppending = false;
+    fat_file*         file = (fat_file*) fd;
+    fat_partition*    partition;
+    fat_cache*        cache;
+    fat_file_position position;
+    uint32_t          tempNextCluster;
+    uint32_t          tempVar;
+    uint32_t          remain;
+    bool              flagNoError   = true;
+    bool              flagAppending = false;
 
     // Make sure we can actually write to the file
     if ((file == NULL) || !file->inUse || !file->write) {
@@ -792,8 +793,8 @@ int32_t fat_write_r(
     fat_lock(&partition->lock);
 
     // Only write up to the maximum file size, taking into account wrap-around of ints
-    if (len + file->filesize > FILE_MAX_SIZE || len + file->filesize < file->filesize) {
-        len = FILE_MAX_SIZE - file->filesize;
+    if (len + file->filesize > fat_file_max_size || len + file->filesize < file->filesize) {
+        len = fat_file_max_size - file->filesize;
     }
 
     // Short circuit cases where len is 0 (or less)
@@ -903,10 +904,10 @@ int32_t fat_write_r(
             break;
         }
         // set indexes to the current position
-        uint32_t      chunkEnd       = position.cluster;
-        uint32_t      nextChunkStart = position.cluster;
-        uint32_t      chunkSize      = partition->bytesPerCluster;
-        FILE_POSITION next_position  = position;
+        uint32_t          chunkEnd       = position.cluster;
+        uint32_t          nextChunkStart = position.cluster;
+        uint32_t          chunkSize      = partition->bytesPerCluster;
+        fat_file_position next_position  = position;
 
         // group consecutive clusters
         while (flagNoError &&
@@ -1014,12 +1015,12 @@ int32_t fat_write_r(
 fat_off_t fat_seek_r(
     struct fat_reent* r, void* fd, fat_off_t pos, int32_t dir
 ) {
-    FILE_STRUCT* file = (FILE_STRUCT*) fd;
-    PARTITION*   partition;
-    uint32_t     cluster, nextCluster;
-    int32_t      clusCount;
-    fat_off_t    newPosition;
-    uint32_t     position;
+    fat_file*      file = (fat_file*) fd;
+    fat_partition* partition;
+    uint32_t       cluster, nextCluster;
+    int32_t        clusCount;
+    fat_off_t      newPosition;
+    uint32_t       position;
 
     if ((file == NULL) || (file->inUse == false)) {
         // invalid file
@@ -1104,9 +1105,9 @@ fat_off_t fat_seek_r(
 int32_t fat_fstat_r(
     struct fat_reent* r, void* fd, struct fat_stat* st
 ) {
-    FILE_STRUCT* file = (FILE_STRUCT*) fd;
-    PARTITION*   partition;
-    DIR_ENTRY    fileEntry;
+    fat_file*      file = (fat_file*) fd;
+    fat_partition* partition;
+    DIR_ENTRY      fileEntry;
 
     if ((file == NULL) || (file->inUse == false)) {
         // invalid file
@@ -1141,10 +1142,10 @@ int32_t fat_fstat_r(
 int32_t fat_ftruncate_r(
     struct fat_reent* r, void* fd, fat_off_t len
 ) {
-    FILE_STRUCT* file = (FILE_STRUCT*) fd;
-    PARTITION*   partition;
-    int32_t      ret     = 0;
-    uint32_t     newSize = (uint32_t) len;
+    fat_file*      file = (fat_file*) fd;
+    fat_partition* partition;
+    int32_t        ret     = 0;
+    uint32_t       newSize = (uint32_t) len;
 
     if (!file || !file->inUse) {
         // invalid file
@@ -1163,8 +1164,8 @@ int32_t fat_ftruncate_r(
 
     if (newSize > file->filesize) {
         // Expanding the file
-        FILE_POSITION savedPosition;
-        uint32_t      savedOffset;
+        fat_file_position savedPosition;
+        uint32_t          savedOffset;
         // Get a new cluster for the start of the file if required
         if (file->startCluster == CLUSTER_FREE) {
             uint32_t tempNextCluster = fat_fat_linkFreeCluster(partition, CLUSTER_FREE);
@@ -1244,8 +1245,8 @@ int32_t fat_ftruncate_r(
 int32_t fat_fsync_r(
     struct fat_reent* r, void* fd
 ) {
-    FILE_STRUCT* file = (FILE_STRUCT*) fd;
-    int32_t      ret  = 0;
+    fat_file* file = (fat_file*) fd;
+    int32_t   ret  = 0;
 
     if (!file->inUse) {
         r->_errno = EBADF;

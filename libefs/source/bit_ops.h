@@ -30,6 +30,10 @@
 
 #include <stdint.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*-----------------------------------------------------------------
 Functions to deal with little endian values stored in uint8_t arrays
 -----------------------------------------------------------------*/
@@ -61,3 +65,7 @@ static inline void u32_to_u8array(
     item[offset + 2] = (uint8_t) (value >> 16);
     item[offset + 3] = (uint8_t) (value >> 24);
 }
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

@@ -31,7 +31,15 @@
 #include <stdint.h>
 #include <time.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 uint16_t fat_filetime_getTimeFromRTC(void);
 uint16_t fat_filetime_getDateFromRTC(void);
 
 time_t fat_filetime_to_time_t(uint16_t t, uint16_t d);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

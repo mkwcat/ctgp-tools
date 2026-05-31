@@ -27,11 +27,14 @@
  EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef fat_H
-#define fat_H
+#pragma once
 
 #include "common.h"
 #include "partition.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum {
     CLUSTER_EOF_16 = 0xFFFF,
@@ -48,21 +51,22 @@ enum {
     CLUSTERS_PER_FAT16 = 65525,
 };
 
-uint32_t fat_fat_nextCluster(PARTITION* partition, uint32_t cluster);
+uint32_t fat_fat_nextCluster(fat_partition* partition, uint32_t cluster);
 
-uint32_t fat_fat_linkFreeCluster(PARTITION* partition, uint32_t cluster);
-uint32_t fat_fat_linkFreeClusterCleared(PARTITION* partition, uint32_t cluster);
+uint32_t fat_fat_linkFreeCluster(fat_partition* partition, uint32_t cluster);
+uint32_t fat_fat_linkFreeClusterCleared(fat_partition* partition, uint32_t cluster);
 
-bool fat_fat_clearLinks(PARTITION* partition, uint32_t cluster);
+bool fat_fat_clearLinks(fat_partition* partition, uint32_t cluster);
 
-uint32_t fat_fat_trimChain(PARTITION* partition, uint32_t startCluster, unsigned int chainLength);
+uint32_t
+fat_fat_trimChain(fat_partition* partition, uint32_t startCluster, unsigned int chainLength);
 
-uint32_t fat_fat_lastCluster(PARTITION* partition, uint32_t cluster);
+uint32_t fat_fat_lastCluster(fat_partition* partition, uint32_t cluster);
 
-unsigned int fat_fat_freeClusterCount(PARTITION* partition);
+unsigned int fat_fat_freeClusterCount(fat_partition* partition);
 
 static inline sec_t fat_fat_clusterToSector(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     return (cluster >= CLUSTER_FIRST)
                ? ((cluster - CLUSTER_FIRST) * (sec_t) partition->sectorsPerCluster) +
@@ -71,10 +75,12 @@ static inline sec_t fat_fat_clusterToSector(
 }
 
 static inline bool fat_fat_isValidCluster(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     return (cluster >= CLUSTER_FIRST) &&
            (cluster <= partition->fat.lastCluster /* This will catch CLUSTER_ERROR */);
 }
 
-#endif // fat_H
+#ifdef __cplusplus
+} // extern "C"
+#endif

@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 
-struct DISC_INTERFACE {
+struct fat_disc {
     FILE*          file;
     struct AES_ctx aes;
     size_t         sector;
@@ -26,8 +26,8 @@ enum {
     BLOCK_SIZE     = (SECTOR_SIZE * BLOCK_SIZE_SEC),
 };
 
-DISC_INTERFACE* fat_efs_disc_create(
-    const char* path, enum EFS_TYPE type
+fat_disc* fat_efs_disc_create(
+    const char* path, enum fat_efs_type type
 ) {
     (void) type;
 
@@ -36,7 +36,7 @@ DISC_INTERFACE* fat_efs_disc_create(
         return NULL;
     }
 
-    DISC_INTERFACE* disc = (DISC_INTERFACE*) fat_mem_allocate(sizeof(DISC_INTERFACE));
+    fat_disc* disc = (fat_disc*) fat_mem_allocate(sizeof(fat_disc));
     if (disc == NULL) {
         fclose(f);
         return NULL;
@@ -48,7 +48,7 @@ DISC_INTERFACE* fat_efs_disc_create(
 }
 
 void fat_efs_disc_destroy(
-    DISC_INTERFACE* disc
+    fat_disc* disc
 ) {
     fclose(disc->file);
     fat_mem_free(disc);
@@ -78,7 +78,7 @@ static void printHex(
 }
 
 bool fat_disc_readSectors(
-    DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, void* buffer
+    fat_disc* disc, sec_t sector, sec_t numSectors, void* buffer
 ) {
     uint8_t iv[16];
     if ((sector % BLOCK_SIZE_SEC) == 0) {
@@ -120,7 +120,7 @@ bool fat_disc_readSectors(
 }
 
 bool fat_disc_writeSectors(
-    DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, const void* buffer
+    fat_disc* disc, sec_t sector, sec_t numSectors, const void* buffer
 ) {
     (void) disc;
     (void) sector;

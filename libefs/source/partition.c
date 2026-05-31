@@ -30,6 +30,7 @@
 #include "partition.h"
 
 #include "bit_ops.h"
+#include "cache.h"
 #include "common.h"
 #include "directory.h"
 #include "disc.h"
@@ -105,7 +106,7 @@ static const char FS_INFO_SIG2[4] = {'r', 'r', 'A', 'a'};
 static const char FS_TWL_SIG[8]   = {0xe9, 0x00, 0x00, 0x54, 0x57, 0x4c, 0x20, 0x20};
 
 // EFS partition labels
-static PARTITION* labels[2];
+static fat_partition* labels[2];
 
 static bool isValidMBR(
     uint8_t* sectorBuffer
@@ -118,7 +119,7 @@ static bool isValidMBR(
 }
 
 static sec_t FindFirstValidPartition_buf(
-    DISC_INTERFACE* disc, uint8_t* sectorBuffer
+    fat_disc* disc, uint8_t* sectorBuffer
 ) {
     uint8_t  part_table[16 * 4];
     uint8_t* ptr;
@@ -182,11 +183,11 @@ static sec_t FindFirstValidPartition_buf(
     return 0;
 }
 
-static PARTITION* fat_partition_constructor_buf(
-    DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector,
+static fat_partition* fat_partition_constructor_buf(
+    fat_disc* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector,
     uint8_t* sectorBuffer
 ) {
-    PARTITION* partition;
+    fat_partition* partition;
 
     // Read first sector of disc
     if (!fat_disc_readSectors(disc, startSector, 1, sectorBuffer)) {
@@ -217,7 +218,7 @@ static PARTITION* fat_partition_constructor_buf(
         return NULL;
     }
 
-    partition = (PARTITION*) fat_mem_allocate(sizeof(PARTITION));
+    partition = (fat_partition*) fat_mem_allocate(sizeof(fat_partition));
     if (partition == NULL) {
         return NULL;
     }
@@ -325,23 +326,23 @@ static PARTITION* fat_partition_constructor_buf(
     return partition;
 }
 
-PARTITION* fat_partition_constructor(
-    DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector
+fat_partition* fat_partition_constructor(
+    fat_disc* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector
 ) {
     uint8_t* sectorBuffer = (uint8_t*) fat_mem_align(MAX_SECTOR_SIZE);
     if (!sectorBuffer) {
         return NULL;
     }
-    PARTITION* ret =
+    fat_partition* ret =
         fat_partition_constructor_buf(disc, cacheSize, sectorsPerPage, startSector, sectorBuffer);
     fat_mem_free(sectorBuffer);
     return ret;
 }
 
 void fat_partition_destructor(
-    PARTITION* partition
+    fat_partition* partition
 ) {
-    FILE_STRUCT* nextFile;
+    fat_file* nextFile;
 
     fat_lock(&partition->lock);
 
@@ -367,7 +368,7 @@ void fat_partition_destructor(
 }
 
 static void fat_updateFS_INFO(
-    PARTITION* partition, uint8_t* sectorBuffer
+    fat_partition* partition, uint8_t* sectorBuffer
 ) {
     partition->fat.numberFreeCluster = fat_fat_freeClusterCount(partition);
     u32_to_u8array(sectorBuffer, FSIB_numberOfFreeCluster, partition->fat.numberFreeCluster);
@@ -378,7 +379,7 @@ static void fat_updateFS_INFO(
 }
 
 void fat_partition_createFSinfo(
-    PARTITION* partition
+    fat_partition* partition
 ) {
     if (partition->readOnly || partition->filesysType != FS_FAT32) {
         return;
@@ -405,7 +406,7 @@ void fat_partition_createFSinfo(
 }
 
 void fat_partition_readFSinfo(
-    PARTITION* partition
+    fat_partition* partition
 ) {
     if (partition->filesysType != FS_FAT32) {
         return;
@@ -441,7 +442,7 @@ void fat_partition_readFSinfo(
 }
 
 void fat_partition_writeFSinfo(
-    PARTITION* partition
+    fat_partition* partition
 ) {
     if (partition->filesysType != FS_FAT32) {
         return;
@@ -474,27 +475,27 @@ void fat_partition_writeFSinfo(
     fat_mem_free(sectorBuffer);
 }
 
-PARTITION* fat_efs_partition_create(
-    const char* path, enum EFS_TYPE type
+fat_partition* fat_efs_partition_create(
+    const char* path, enum fat_efs_type type
 ) {
     if (labels[type]) {
         return labels[type];
     }
 
-    DISC_INTERFACE* disc = fat_efs_disc_create(path, type);
-    return labels[type]  = fat_partition_constructor(
-               disc, fat_DEFAULT_CACHE_PAGES, fat_DEFAULT_SECTORS_PAGE, 0
+    fat_disc* disc      = fat_efs_disc_create(path, type);
+    return labels[type] = fat_partition_constructor(
+               disc, fat_DEFAULT_fat_cache_PAGES, fat_DEFAULT_SECTORS_PAGE, 0
            );
 }
 
-PARTITION* fat_partition_getPartitionFromPath(
+fat_partition* fat_partition_getPartitionFromPath(
     const char* path
 ) {
     if (strncmp(path, "efa:", 4) == 0) {
-        return labels[EFS_TYPE_EFA];
+        return labels[fat_efs_type_efa];
     }
     if (strncmp(path, "efb:", 4) == 0) {
-        return labels[EFS_TYPE_EFB];
+        return labels[fat_efs_type_efb];
     }
     return NULL;
 }

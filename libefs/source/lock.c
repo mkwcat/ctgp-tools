@@ -1,7 +1,7 @@
 #include "lock.h"
 
 void fat_lock_init(
-    mutex_t* mutex
+    fat_mutex_t* mutex
 ) {
     (void) mutex;
 
@@ -9,7 +9,7 @@ void fat_lock_init(
 }
 
 void fat_lock_deinit(
-    mutex_t* mutex
+    fat_mutex_t* mutex
 ) {
     (void) mutex;
 
@@ -17,7 +17,7 @@ void fat_lock_deinit(
 }
 
 void fat_lock(
-    mutex_t* mutex
+    fat_mutex_t* mutex
 ) {
     (void) mutex;
 
@@ -25,7 +25,7 @@ void fat_lock(
 }
 
 void fat_unlock(
-    mutex_t* mutex
+    fat_mutex_t* mutex
 ) {
     (void) mutex;
 

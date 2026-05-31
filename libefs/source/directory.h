@@ -29,6 +29,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "common.h"
 #include "partition.h"
 
@@ -130,7 +134,7 @@ Places result in entry
 entry will be destroyed even if no directory entry is found
 Returns true on success, false on failure
 */
-bool fat_directory_getFirstEntry(PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster);
+bool fat_directory_getFirstEntry(fat_partition* partition, DIR_ENTRY* entry, uint32_t dirCluster);
 
 /*
 Reads the next directory entry after the one already pointed to by entry
@@ -138,7 +142,7 @@ Places result in entry
 entry will be destroyed even if no directory entry is found
 Returns true on success, false on failure
 */
-bool fat_directory_getNextEntry(PARTITION* partition, DIR_ENTRY* entry);
+bool fat_directory_getNextEntry(fat_partition* partition, DIR_ENTRY* entry);
 
 /*
 Gets the directory entry corrsponding to the supplied path
@@ -150,21 +154,21 @@ pathEnd specifies the end of the path string, for cutting strings short if neede
 Returns true on success, false on failure
 */
 bool fat_directory_entryFromPath(
-    PARTITION* partition, DIR_ENTRY* entry, const char* path, const char* pathEnd
+    fat_partition* partition, DIR_ENTRY* entry, const char* path, const char* pathEnd
 );
 
 /*
 Changes the current directory to the one specified by path
 Returns true on success, false on failure
 */
-bool fat_directory_chdir(PARTITION* partition, const char* path);
+bool fat_directory_chdir(fat_partition* partition, const char* path);
 
 /*
 Removes the directory entry specified by entry
 Assumes that entry is valid
 Returns true on success, false on failure
 */
-bool fat_directory_removeEntry(PARTITION* partition, DIR_ENTRY* entry);
+bool fat_directory_removeEntry(fat_partition* partition, DIR_ENTRY* entry);
 
 /*
 Add a directory entry to the directory specified by dirCluster
@@ -172,26 +176,30 @@ The fileData, dataStart and dataEnd elements of the DIR_ENTRY struct are
 updated with the new directory entry position and alias.
 Returns true on success, false on failure
 */
-bool fat_directory_addEntry(PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster);
+bool fat_directory_addEntry(fat_partition* partition, DIR_ENTRY* entry, uint32_t dirCluster);
 
 /*
 Get the start cluster of a file from it's entry data
 */
-uint32_t fat_directory_entryGetCluster(PARTITION* partition, const uint8_t* entryData);
+uint32_t fat_directory_entryGetCluster(fat_partition* partition, const uint8_t* entryData);
 
 /*
 Fill in the file name and entry data of DIR_ENTRY* entry.
 Assumes that the entry's dataStart and dataEnd are correct
 Returns true on success, false on failure
 */
-bool fat_directory_entryFromPosition(PARTITION* partition, DIR_ENTRY* entry);
+bool fat_directory_entryFromPosition(fat_partition* partition, DIR_ENTRY* entry);
 
 /*
 Fill in a stat struct based on a file entry
 */
-void fat_directory_entryStat(PARTITION* partition, DIR_ENTRY* entry, struct fat_stat* st);
+void fat_directory_entryStat(fat_partition* partition, DIR_ENTRY* entry, struct fat_stat* st);
 
 /*
 Get volume label
 */
-bool fat_directory_getVolumeLabel(PARTITION* partition, char* label);
+bool fat_directory_getVolumeLabel(fat_partition* partition, char* label);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

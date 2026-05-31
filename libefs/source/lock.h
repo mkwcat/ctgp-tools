@@ -28,9 +28,17 @@
 
 #pragma once
 
-typedef int mutex_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-void fat_lock_init(mutex_t* mutex);
-void fat_lock_deinit(mutex_t* mutex);
-void fat_lock(mutex_t* mutex);
-void fat_unlock(mutex_t* mutex);
+typedef char fat_mutex_t;
+
+void fat_lock_init(fat_mutex_t* mutex);
+void fat_lock_deinit(fat_mutex_t* mutex);
+void fat_lock(fat_mutex_t* mutex);
+void fat_unlock(fat_mutex_t* mutex);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

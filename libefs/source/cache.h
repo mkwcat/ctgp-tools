@@ -38,22 +38,26 @@
 #include "common.h"
 #include "disc.h"
 
-typedef struct CACHE_ENTRY {
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct fat_cache_entry {
     sec_t    sector;
     uint32_t count;
     uint32_t last_access;
     bool     dirty;
     uint8_t* cache;
-} CACHE_ENTRY;
+} fat_cache_entry;
 
-typedef struct CACHE {
-    DISC_INTERFACE* disc;
-    sec_t           endOfPartition;
-    uint32_t        numberOfPages;
-    uint32_t        sectorsPerPage;
-    uint32_t        bytesPerSector;
-    CACHE_ENTRY*    cacheEntries;
-} CACHE;
+typedef struct fat_cache {
+    fat_disc*        disc;
+    sec_t            endOfPartition;
+    uint32_t         numberOfPages;
+    uint32_t         sectorsPerPage;
+    uint32_t         bytesPerSector;
+    fat_cache_entry* cacheEntries;
+} fat_cache;
 
 /*
 Read data from a sector in the cache
@@ -63,11 +67,11 @@ size is the amount of data to read
 Precondition: offset + size <= BYTES_PER_READ
 */
 bool fat_cache_readPartialSector(
-    CACHE* cache, void* buffer, sec_t sector, uint32_t offset, size_t size
+    fat_cache* cache, void* buffer, sec_t sector, uint32_t offset, size_t size
 );
 
 bool fat_cache_readLittleEndianValue(
-    CACHE* cache, uint32_t* value, sec_t sector, uint32_t offset, int32_t num_bytes
+    fat_cache* cache, uint32_t* value, sec_t sector, uint32_t offset, int32_t num_bytes
 );
 
 /*
@@ -79,11 +83,11 @@ size is the amount of data to write
 Precondition: offset + size <= BYTES_PER_READ
 */
 bool fat_cache_writePartialSector(
-    CACHE* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
+    fat_cache* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
 );
 
 bool fat_cache_writeLittleEndianValue(
-    CACHE* cache, const uint32_t value, sec_t sector, uint32_t offset, int32_t num_bytes
+    fat_cache* cache, const uint32_t value, sec_t sector, uint32_t offset, int32_t num_bytes
 );
 
 /*
@@ -95,19 +99,19 @@ size is the amount of data to write
 Precondition: offset + size <= BYTES_PER_READ
 */
 bool fat_cache_eraseWritePartialSector(
-    CACHE* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
+    fat_cache* cache, const void* buffer, sec_t sector, uint32_t offset, size_t size
 );
 
 /*
 Read several sectors from the cache
 */
-bool fat_cache_readSectors(CACHE* cache, sec_t sector, sec_t numSectors, void* buffer);
+bool fat_cache_readSectors(fat_cache* cache, sec_t sector, sec_t numSectors, void* buffer);
 
 /*
 Read a full sector from the cache
 */
 static inline bool fat_cache_readSector(
-    CACHE* cache, void* buffer, sec_t sector
+    fat_cache* cache, void* buffer, sec_t sector
 ) {
     return fat_cache_readPartialSector(cache, buffer, sector, 0, cache->bytesPerSector);
 }
@@ -116,26 +120,30 @@ static inline bool fat_cache_readSector(
 Write a full sector to the cache
 */
 static inline bool fat_cache_writeSector(
-    CACHE* cache, const void* buffer, sec_t sector
+    fat_cache* cache, const void* buffer, sec_t sector
 ) {
     return fat_cache_writePartialSector(cache, buffer, sector, 0, cache->bytesPerSector);
 }
 
-bool fat_cache_writeSectors(CACHE* cache, sec_t sector, sec_t numSectors, const void* buffer);
+bool fat_cache_writeSectors(fat_cache* cache, sec_t sector, sec_t numSectors, const void* buffer);
 
 /*
 Write any dirty sectors back to disc and clear out the contents of the cache
 */
-bool fat_cache_flush(CACHE* cache);
+bool fat_cache_flush(fat_cache* cache);
 
 /*
 Clear out the contents of the cache without writing any dirty sectors first
 */
-void fat_cache_invalidate(CACHE* cache);
+void fat_cache_invalidate(fat_cache* cache);
 
-CACHE* fat_cache_constructor(
-    uint32_t numberOfPages, uint32_t sectorsPerPage, DISC_INTERFACE* discInterface,
-    sec_t endOfPartition, uint32_t bytesPerSector
+fat_cache* fat_cache_constructor(
+    uint32_t numberOfPages, uint32_t sectorsPerPage, fat_disc* discInterface, sec_t endOfPartition,
+    uint32_t bytesPerSector
 );
 
-void fat_cache_destructor(CACHE* cache);
+void fat_cache_destructor(fat_cache* cache);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif

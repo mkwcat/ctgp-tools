@@ -29,6 +29,7 @@
 
 #include "file_allocation_table.h"
 
+#include "cache.h"
 #include "mem_allocate.h"
 #include "partition.h"
 #include <string.h>
@@ -37,7 +38,7 @@
 Gets the cluster linked from input cluster
 */
 uint32_t fat_fat_nextCluster(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     uint32_t nextCluster = CLUSTER_FREE;
     sec_t    sector;
@@ -123,7 +124,7 @@ writes value into the correct offset within a partition's FAT, based
 on the cluster number.
 */
 static bool fat_fat_writeFatEntry(
-    PARTITION* partition, uint32_t cluster, uint32_t value
+    fat_partition* partition, uint32_t cluster, uint32_t value
 ) {
     sec_t    sector;
     uint32_t offset;
@@ -217,7 +218,7 @@ cluster number
 If an error occurs, return CLUSTER_ERROR
 -----------------------------------------------------------------*/
 uint32_t fat_fat_linkFreeCluster(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     uint32_t firstFree;
     uint32_t curLink;
@@ -282,7 +283,7 @@ cluster to 0 valued bytes, then returns the cluster number
 If an error occurs, return CLUSTER_ERROR
 -----------------------------------------------------------------*/
 uint32_t fat_fat_linkFreeClusterCleared(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     uint32_t newCluster;
     uint32_t i;
@@ -315,7 +316,7 @@ fat_fat_clearLinks
 frees any cluster used by a file
 -----------------------------------------------------------------*/
 bool fat_fat_clearLinks(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     uint32_t nextCluster;
 
@@ -356,7 +357,7 @@ dropped, and so on.
 Return the last cluster left in the chain.
 -----------------------------------------------------------------*/
 uint32_t fat_fat_trimChain(
-    PARTITION* partition, uint32_t startCluster, unsigned int chainLength
+    fat_partition* partition, uint32_t startCluster, unsigned int chainLength
 ) {
     uint32_t nextCluster;
 
@@ -391,7 +392,7 @@ fat_fat_lastCluster
 Trace the cluster links until the last one is found
 -----------------------------------------------------------------*/
 uint32_t fat_fat_lastCluster(
-    PARTITION* partition, uint32_t cluster
+    fat_partition* partition, uint32_t cluster
 ) {
     while ((fat_fat_nextCluster(partition, cluster) != CLUSTER_FREE) &&
            (fat_fat_nextCluster(partition, cluster) != CLUSTER_EOF)) {
@@ -405,7 +406,7 @@ fat_fat_freeClusterCount
 Return the number of free clusters available
 -----------------------------------------------------------------*/
 unsigned int fat_fat_freeClusterCount(
-    PARTITION* partition
+    fat_partition* partition
 ) {
     unsigned int count = 0;
     uint32_t     curCluster;

@@ -44,8 +44,8 @@
 int fat_stat_r(
     struct fat_reent* r, const char* path, struct fat_stat* st
 ) {
-    PARTITION* partition = NULL;
-    DIR_ENTRY  dirEntry;
+    fat_partition* partition = NULL;
+    DIR_ENTRY      dirEntry;
 
     // Get the partition this file is on
     partition = fat_partition_getPartitionFromPath(path);
@@ -92,15 +92,15 @@ int fat_link_r(
 static int fat_unlinkCommon(
     struct fat_reent* r, const char* path, bool isRmDir
 ) {
-    PARTITION* partition = NULL;
-    DIR_ENTRY  dirEntry;
-    DIR_ENTRY  dirContents;
-    uint32_t   cluster;
-    bool       nextEntry;
-    bool       errorOccured = false;
+    fat_partition* partition = NULL;
+    DIR_ENTRY      dirEntry;
+    DIR_ENTRY      dirContents;
+    uint32_t       cluster;
+    bool           nextEntry;
+    bool           errorOccured = false;
 
     // Get the partition this directory is on
-    partition               = fat_partition_getPartitionFromPath(path);
+    partition                   = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
         r->_errno = ENODEV;
         return -1;
@@ -194,10 +194,10 @@ int fat_unlink_r(
 int fat_chdir_r(
     struct fat_reent* r, const char* path
 ) {
-    PARTITION* partition = NULL;
+    fat_partition* partition = NULL;
 
     // Get the partition this directory is on
-    partition            = fat_partition_getPartitionFromPath(path);
+    partition                = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
         r->_errno = ENODEV;
         return -1;
@@ -230,11 +230,11 @@ int fat_chdir_r(
 int fat_rename_r(
     struct fat_reent* r, const char* oldName, const char* newName
 ) {
-    PARTITION*  partition = NULL;
-    DIR_ENTRY   oldDirEntry;
-    DIR_ENTRY   newDirEntry;
-    const char* pathEnd;
-    uint32_t    dirCluster;
+    fat_partition* partition = NULL;
+    DIR_ENTRY      oldDirEntry;
+    DIR_ENTRY      newDirEntry;
+    const char*    pathEnd;
+    uint32_t       dirCluster;
 
     // Get the partition this directory is on
     partition = fat_partition_getPartitionFromPath(oldName);
@@ -346,12 +346,12 @@ int fat_rename_r(
 int fat_mkdir_r(
     struct fat_reent* r, const char* path
 ) {
-    PARTITION*  partition = NULL;
-    bool        fileExists;
-    DIR_ENTRY   dirEntry;
-    const char* pathEnd;
-    uint32_t    parentCluster, dirCluster;
-    uint8_t     newEntryData[DIR_ENTRY_DATA_SIZE];
+    fat_partition* partition = NULL;
+    bool           fileExists;
+    DIR_ENTRY      dirEntry;
+    const char*    pathEnd;
+    uint32_t       parentCluster, dirCluster;
+    uint8_t        newEntryData[DIR_ENTRY_DATA_SIZE];
 
     partition = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
@@ -491,7 +491,7 @@ int fat_rmdir_r(
 int fat_statvfs_r(
     struct fat_reent* r, const char* path, struct statvfs* buf
 ) {
-    PARTITION*   partition = NULL;
+    fat_partition*   partition = NULL;
     unsigned int freeClusterCount;
 
     // Get the partition of the requested path
@@ -541,12 +541,12 @@ int fat_statvfs_r(
 }
 #endif
 
-DIR_ITER* fat_diropen_r(
-    struct fat_reent* r, DIR_ITER* dirState, const char* path
+fat_dir_iter* fat_diropen_r(
+    struct fat_reent* r, fat_dir_iter* dirState, const char* path
 ) {
-    DIR_ENTRY         dirEntry;
-    DIR_STATE_STRUCT* state = (DIR_STATE_STRUCT*) (dirState->dirStruct);
-    bool              fileExists;
+    DIR_ENTRY      dirEntry;
+    fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
+    bool           fileExists;
 
     state->partition = fat_partition_getPartitionFromPath(path);
     if (state->partition == NULL) {
@@ -591,13 +591,13 @@ DIR_ITER* fat_diropen_r(
     // We are now using this entry
     state->inUse = true;
     fat_unlock(&state->partition->lock);
-    return (DIR_ITER*) state;
+    return (fat_dir_iter*) state;
 }
 
 int fat_dirreset_r(
-    struct fat_reent* r, DIR_ITER* dirState
+    struct fat_reent* r, fat_dir_iter* dirState
 ) {
-    DIR_STATE_STRUCT* state = (DIR_STATE_STRUCT*) (dirState->dirStruct);
+    fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
 
     fat_lock(&state->partition->lock);
 
@@ -617,9 +617,9 @@ int fat_dirreset_r(
 }
 
 int fat_dirnext_r(
-    struct fat_reent* r, DIR_ITER* dirState, char* filename, struct fat_stat* filestat
+    struct fat_reent* r, fat_dir_iter* dirState, char* filename, struct fat_stat* filestat
 ) {
-    DIR_STATE_STRUCT* state = (DIR_STATE_STRUCT*) (dirState->dirStruct);
+    fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
 
     fat_lock(&state->partition->lock);
 
@@ -651,11 +651,11 @@ int fat_dirnext_r(
 }
 
 int fat_dirclose_r(
-    struct fat_reent* r, DIR_ITER* dirState
+    struct fat_reent* r, fat_dir_iter* dirState
 ) {
     (void) r;
 
-    DIR_STATE_STRUCT* state = (DIR_STATE_STRUCT*) (dirState->dirStruct);
+    fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
 
     // We are no longer using this entry
     fat_lock(&state->partition->lock);

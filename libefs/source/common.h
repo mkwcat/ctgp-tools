@@ -45,7 +45,7 @@ typedef int32_t  fat_ino_t;
 typedef struct {
     int32_t device;
     void*   dirStruct;
-} DIR_ITER;
+} fat_dir_iter;
 
 struct fat_stat {
     int32_t   st_dev;
@@ -93,8 +93,8 @@ enum {
 };
 
 enum {
-    fat_DEFAULT_CACHE_PAGES  = 4,
-    fat_DEFAULT_SECTORS_PAGE = 64,
+    fat_DEFAULT_fat_cache_PAGES = 4,
+    fat_DEFAULT_SECTORS_PAGE    = 64,
 };
 
 #ifdef __cplusplus

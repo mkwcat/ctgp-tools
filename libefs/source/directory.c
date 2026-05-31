@@ -30,6 +30,7 @@
 #include "directory.h"
 
 #include "bit_ops.h"
+#include "cache.h"
 #include "common.h"
 #include "file_allocation_table.h"
 #include "filetime.h"
@@ -254,7 +255,7 @@ static bool fat_directory_entryGetAlias(
 }
 
 uint32_t fat_directory_entryGetCluster(
-    PARTITION* partition, const uint8_t* entryData
+    fat_partition* partition, const uint8_t* entryData
 ) {
     if (partition->filesysType == FS_FAT32) {
         // Only use high 16 bits of start cluster when we are certain they are correctly defined
@@ -266,7 +267,7 @@ uint32_t fat_directory_entryGetCluster(
 }
 
 static bool fat_directory_incrementDirEntryPosition(
-    PARTITION* partition, DIR_ENTRY_POSITION* entryPosition, bool extendDirectory
+    fat_partition* partition, DIR_ENTRY_POSITION* entryPosition, bool extendDirectory
 ) {
     DIR_ENTRY_POSITION position = *entryPosition;
     uint32_t           tempCluster;
@@ -304,7 +305,7 @@ static bool fat_directory_incrementDirEntryPosition(
 }
 
 bool fat_directory_getNextEntry(
-    PARTITION* partition, DIR_ENTRY* entry
+    fat_partition* partition, DIR_ENTRY* entry
 ) {
     DIR_ENTRY_POSITION entryStart;
     DIR_ENTRY_POSITION entryEnd;
@@ -416,7 +417,7 @@ bool fat_directory_getNextEntry(
 }
 
 bool fat_directory_getFirstEntry(
-    PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster
+    fat_partition* partition, DIR_ENTRY* entry, uint32_t dirCluster
 ) {
     entry->dataStart.cluster = dirCluster;
     entry->dataStart.sector  = 0;
@@ -428,7 +429,7 @@ bool fat_directory_getFirstEntry(
 }
 
 static bool fat_directory_getRootEntry(
-    PARTITION* partition, DIR_ENTRY* entry
+    fat_partition* partition, DIR_ENTRY* entry
 ) {
     entry->dataStart.cluster = 0;
     entry->dataStart.sector  = 0;
@@ -452,7 +453,7 @@ static bool fat_directory_getRootEntry(
 }
 
 bool fat_directory_getVolumeLabel(
-    PARTITION* partition, char* label
+    fat_partition* partition, char* label
 ) {
     DIR_ENTRY          entry;
     DIR_ENTRY_POSITION entryEnd;
@@ -500,7 +501,7 @@ bool fat_directory_getVolumeLabel(
 }
 
 bool fat_directory_entryFromPosition(
-    PARTITION* partition, DIR_ENTRY* entry
+    fat_partition* partition, DIR_ENTRY* entry
 ) {
     DIR_ENTRY_POSITION entryStart = entry->dataStart;
     DIR_ENTRY_POSITION entryEnd   = entry->dataEnd;
@@ -561,7 +562,7 @@ bool fat_directory_entryFromPosition(
 }
 
 bool fat_directory_entryFromPath(
-    PARTITION* partition, DIR_ENTRY* entry, const char* path, const char* pathEnd
+    fat_partition* partition, DIR_ENTRY* entry, const char* path, const char* pathEnd
 ) {
     uint32_t    dirnameLength;
     const char* pathPosition;
@@ -692,7 +693,7 @@ bool fat_directory_entryFromPath(
 }
 
 bool fat_directory_removeEntry(
-    PARTITION* partition, DIR_ENTRY* entry
+    fat_partition* partition, DIR_ENTRY* entry
 ) {
     DIR_ENTRY_POSITION entryStart = entry->dataStart;
     DIR_ENTRY_POSITION entryEnd   = entry->dataEnd;
@@ -728,7 +729,7 @@ bool fat_directory_removeEntry(
 }
 
 static bool fat_directory_findEntryGap(
-    PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster, uint32_t size
+    fat_partition* partition, DIR_ENTRY* entry, uint32_t dirCluster, uint32_t size
 ) {
     DIR_ENTRY_POSITION gapStart;
     DIR_ENTRY_POSITION gapEnd;
@@ -808,7 +809,7 @@ static bool fat_directory_findEntryGap(
 }
 
 static bool fat_directory_entryExists(
-    PARTITION* partition, const char* name, uint32_t dirCluster
+    fat_partition* partition, const char* name, uint32_t dirCluster
 ) {
     DIR_ENTRY tempEntry;
     bool      foundFile;
@@ -959,7 +960,7 @@ static int32_t fat_directory_createAlias(
 }
 
 bool fat_directory_addEntry(
-    PARTITION* partition, DIR_ENTRY* entry, uint32_t dirCluster
+    fat_partition* partition, DIR_ENTRY* entry, uint32_t dirCluster
 ) {
     uint32_t           entrySize;
     uint8_t            lfnEntry[DIR_ENTRY_DATA_SIZE];
@@ -1154,7 +1155,7 @@ bool fat_directory_addEntry(
 }
 
 bool fat_directory_chdir(
-    PARTITION* partition, const char* path
+    fat_partition* partition, const char* path
 ) {
     DIR_ENTRY entry;
 
@@ -1172,7 +1173,7 @@ bool fat_directory_chdir(
 }
 
 void fat_directory_entryStat(
-    PARTITION* partition, DIR_ENTRY* entry, struct fat_stat* st
+    fat_partition* partition, DIR_ENTRY* entry, struct fat_stat* st
 ) {
     // Fill in the stat struct
     // Some of the values are faked for the sake of compatibility

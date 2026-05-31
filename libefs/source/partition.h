@@ -29,10 +29,13 @@
 
 #pragma once
 
-#include "cache.h"
 #include "common.h"
 #include "disc.h"
 #include "lock.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 enum {
     MIN_SECTOR_SIZE = 512,
@@ -40,12 +43,12 @@ enum {
 };
 
 // Filesystem type
-typedef enum {
+typedef enum fat_fs_type {
     FS_UNKNOWN,
     FS_FAT12,
     FS_FAT16,
     FS_FAT32,
-} FS_TYPE;
+} fat_fs_type;
 
 typedef struct {
     sec_t    fatStart;
@@ -56,64 +59,68 @@ typedef struct {
     uint32_t numberLastAllocCluster;
 } FAT;
 
-typedef struct {
-    DISC_INTERFACE* disc;
-    CACHE*          cache;
+typedef struct fat_partition {
+    fat_disc*         disc;
+    struct fat_cache* cache;
     // Info about the partition
-    FS_TYPE  filesysType;
-    uint64_t totalSize;
-    sec_t    rootDirStart;
-    uint32_t rootDirCluster;
-    uint32_t numberOfSectors;
-    sec_t    dataStart;
-    uint32_t bytesPerSector;
-    uint32_t sectorsPerCluster;
-    uint32_t bytesPerCluster;
-    uint32_t fsInfoSector;
-    FAT      fat;
+    fat_fs_type filesysType;
+    uint64_t    totalSize;
+    sec_t       rootDirStart;
+    uint32_t    rootDirCluster;
+    uint32_t    numberOfSectors;
+    sec_t       dataStart;
+    uint32_t    bytesPerSector;
+    uint32_t    sectorsPerCluster;
+    uint32_t    bytesPerCluster;
+    uint32_t    fsInfoSector;
+    FAT         fat;
     // Values that may change after construction
-    uint32_t            cwdCluster; // Current working directory cluster
-    int                 openFileCount;
-    struct FILE_STRUCT* firstOpenFile; // The start of a linked list of files
-    mutex_t             lock;          // A lock for partition operations
-    bool                readOnly;      // If this is set, then do not try writing to the disc
-    char                label[12];     // Volume label
-} PARTITION;
+    uint32_t         cwdCluster; // Current working directory cluster
+    int              openFileCount;
+    struct fat_file* firstOpenFile; // The start of a linked list of files
+    fat_mutex_t      lock;          // A lock for partition operations
+    bool             readOnly;      // If this is set, then do not try writing to the disc
+    char             label[12];     // Volume label
+} fat_partition;
 
 /*
 Mount the supplied device and return a pointer to the struct necessary to use it
 */
-PARTITION* fat_partition_constructor(
-    DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t SectorsPerPage, sec_t startSector
+fat_partition* fat_partition_constructor(
+    fat_disc* disc, uint32_t cacheSize, uint32_t SectorsPerPage, sec_t startSector
 );
 
 /*
 Dismount the device and free all structures used.
 Will also attempt to synchronise all open files to disc.
 */
-void fat_partition_destructor(PARTITION* partition);
+void fat_partition_destructor(fat_partition* partition);
 
 /*
 Return the partition specified in a path, as taken from the devoptab.
 */
-PARTITION* fat_partition_getPartitionFromPath(const char* path);
+fat_partition* fat_partition_getPartitionFromPath(const char* path);
 
 /*
 Create the fs info sector.
 */
-void fat_partition_createFSinfo(PARTITION* partition);
+void fat_partition_createFSinfo(fat_partition* partition);
 
 /*
 Read the fs info sector data.
 */
-void fat_partition_readFSinfo(PARTITION* partition);
+void fat_partition_readFSinfo(fat_partition* partition);
 
 /*
 Write the fs info sector data.
 */
-void fat_partition_writeFSinfo(PARTITION* partition);
+void fat_partition_writeFSinfo(fat_partition* partition);
 
 /*
 Create a partition and disc for the specified EFS type.
 */
-PARTITION* fat_efs_partition_create(const char* path, enum EFS_TYPE type);
+fat_partition* fat_efs_partition_create(const char* path, enum fat_efs_type type);
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
