@@ -1,0 +1,6 @@
+.vscode/
+.DS_Store
+libefs/*.exe
+libefs/*.out
+libefs/*.elf
+blob.bin
