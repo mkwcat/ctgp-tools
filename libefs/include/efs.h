@@ -10,6 +10,7 @@ enum efs_type {
 };
 
 bool efs_mount(const char* path, enum efs_type type);
+bool efs_unmount(enum efs_type type);
 
 typedef struct fat_dir_iter {
     int32_t device;

@@ -484,15 +484,43 @@ fat_partition* fat_efs_partition_create(
     }
 
     fat_disc* disc      = fat_efs_disc_create(path, type);
+    if (disc == NULL) {
+        return NULL;
+    }
+
     return labels[type] = fat_partition_constructor(
                disc, fat_DEFAULT_fat_cache_PAGES, fat_DEFAULT_SECTORS_PAGE, 0
            );
+}
+
+bool fat_efs_partition_destroy(
+    enum efs_type type
+) {
+    fat_partition* p = labels[type];
+    if (!p) {
+        return false;
+    }
+
+    fat_disc* d = p->disc;
+    if (!d) {
+        return false;
+    }
+
+    fat_partition_destructor(p);
+    fat_efs_disc_destroy(d);
+    return true;
 }
 
 bool efs_mount(
     const char* path, enum efs_type type
 ) {
     return fat_efs_partition_create(path, type);
+}
+
+bool efs_unmount(
+    enum efs_type type
+) {
+    return fat_efs_partition_destroy(type);
 }
 
 fat_partition* fat_partition_getPartitionFromPath(
