@@ -4,3 +4,4 @@
 -Wno-covered-switch-default
 -Wno-declaration-after-statement
 -Wno-poison-system-directories
+-Iinclude

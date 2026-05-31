@@ -37,6 +37,7 @@
 #include "file_allocation_table.h"
 #include "filetime.h"
 #include "lock.h"
+#include "mem_allocate.h"
 #include "partition.h"
 #include <ctype.h>
 #include <errno.h>
@@ -45,7 +46,7 @@
 #include <unistd.h>
 
 static bool fat_findEntry(
-    const char* path, DIR_ENTRY* dirEntry
+    const char* path, fat_dir_entry* dirEntry
 ) {
     bool           r;
     fat_partition* partition = fat_partition_getPartitionFromPath(path);
@@ -71,24 +72,24 @@ static bool fat_findEntry(
     return r;
 }
 
-int32_t fat_getAttr(
+int32_t efs_getAttr(
     const char* file
 ) {
-    DIR_ENTRY dirEntry;
+    fat_dir_entry dirEntry;
     if (!fat_findEntry(file, &dirEntry)) {
         return -1;
     }
 
-    return dirEntry.entryData[DIR_ENTRY_attributes];
+    return dirEntry.entryData[fat_dir_entry_attributes];
 }
 
-int32_t fat_setAttr(
+int efs_setAttr(
     const char* file, uint8_t attr
 ) {
     // Defines...
-    DIR_ENTRY_POSITION entryEnd;
-    fat_partition*     partition = NULL;
-    DIR_ENTRY          dirEntry;
+    fat_dir_entry_position entryEnd;
+    fat_partition*         partition = NULL;
+    fat_dir_entry          dirEntry;
 
     // Get Partition
     partition = fat_partition_getPartitionFromPath(file);
@@ -109,7 +110,7 @@ int32_t fat_setAttr(
     // Lock Partition
     fat_lock(&partition->lock);
 
-    // Get DIR_ENTRY
+    // Get fat_dir_entry
     if (!fat_directory_entryFromPath(partition, &dirEntry, file, NULL)) {
         fat_unlock(&partition->lock); // Unlock Partition
         return -1;
@@ -126,7 +127,7 @@ int32_t fat_setAttr(
         ,
         fat_fat_clusterToSector(partition, entryEnd.cluster) + entryEnd.sector // cluster
         ,
-        entryEnd.offset * DIR_ENTRY_DATA_SIZE + DIR_ENTRY_attributes // offset
+        entryEnd.offset * fat_dir_entry_DATA_SIZE + fat_dir_entry_attributes // offset
         ,
         1 // Size in bytes
     );
@@ -143,19 +144,36 @@ int32_t fat_setAttr(
     return 0;
 }
 
-fat_file* fat_open_r(
-    struct fat_reent* r, fat_file* fileStruct, const char* path, int32_t flags
+void* efs_open(
+    int* error, const char* path, int32_t flags
+) {
+    fat_file* ptr = (fat_file*) fat_mem_allocate(sizeof(fat_file));
+    if (!ptr) {
+        *error = ENOMEM;
+        return NULL;
+    }
+    if (!efs_open_r(error, ptr, path, flags)) {
+        free(ptr);
+        return NULL;
+    }
+
+    ptr->allocated = true;
+    return ptr;
+}
+
+fat_file* efs_open_r(
+    int* error, fat_file* fileStruct, const char* path, int32_t flags
 ) {
     fat_partition* partition = NULL;
     bool           fileExists;
-    DIR_ENTRY      dirEntry;
+    fat_dir_entry  dirEntry;
     const char*    pathEnd;
     uint32_t       dirCluster;
     fat_file*      file = (fat_file*) fileStruct;
     partition           = fat_partition_getPartitionFromPath(path);
 
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return NULL;
     }
 
@@ -164,9 +182,11 @@ fat_file* fat_open_r(
         path = strchr(path, ':') + 1;
     }
     if (strchr(path, ':') != NULL) {
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return NULL;
     }
+
+    file->allocated = false;
 
     // Determine which mode the file is openned for
     if ((flags & 0x03) == O_RDONLY) {
@@ -185,13 +205,13 @@ fat_file* fat_open_r(
         file->write  = true;
         file->append = false;
     } else {
-        r->_errno = EACCES;
+        *error = EACCES;
         return NULL;
     }
 
     // Make sure we aren't trying to write to a read-only disc
     if (file->write && partition->readOnly) {
-        r->_errno = EROFS;
+        *error = EROFS;
         return NULL;
     }
 
@@ -202,14 +222,14 @@ fat_file* fat_open_r(
     // The file shouldn't exist if we are trying to create it
     if ((flags & O_CREAT) && (flags & O_EXCL) && fileExists) {
         fat_unlock(&partition->lock);
-        r->_errno = EEXIST;
+        *error = EEXIST;
         return NULL;
     }
 
     // It should not be a directory if we're openning a file,
     if (fileExists && fat_directory_isDirectory(&dirEntry)) {
         fat_unlock(&partition->lock);
-        r->_errno = EISDIR;
+        *error = EISDIR;
         return NULL;
     }
 
@@ -222,7 +242,7 @@ fat_file* fat_open_r(
             if (partition->readOnly) {
                 // We can't write to a read-only partition
                 fat_unlock(&partition->lock);
-                r->_errno = EROFS;
+                *error = EROFS;
                 return NULL;
             }
             // Create the file
@@ -238,7 +258,7 @@ fat_file* fat_open_r(
                 if (!fat_directory_entryFromPath(partition, &dirEntry, path, pathEnd) ||
                     !fat_directory_isDirectory(&dirEntry)) {
                     fat_unlock(&partition->lock);
-                    r->_errno = ENOTDIR;
+                    *error = ENOTDIR;
                     return NULL;
                 }
                 dirCluster = fat_directory_entryGetCluster(partition, dirEntry.entryData);
@@ -247,16 +267,16 @@ fat_file* fat_open_r(
             }
             // Create the entry data
             strncpy(dirEntry.filename, pathEnd, fat_NAME_MAX - 1);
-            memset(dirEntry.entryData, 0, DIR_ENTRY_DATA_SIZE);
+            memset(dirEntry.entryData, 0, fat_dir_entry_DATA_SIZE);
 
             // Set the creation time and date
-            dirEntry.entryData[DIR_ENTRY_cTime_ms] = 0;
-            u16_to_u8array(dirEntry.entryData, DIR_ENTRY_cTime, fat_filetime_getTimeFromRTC());
-            u16_to_u8array(dirEntry.entryData, DIR_ENTRY_cDate, fat_filetime_getDateFromRTC());
+            dirEntry.entryData[fat_dir_entry_cTime_ms] = 0;
+            u16_to_u8array(dirEntry.entryData, fat_dir_entry_cTime, fat_filetime_getTimeFromRTC());
+            u16_to_u8array(dirEntry.entryData, fat_dir_entry_cDate, fat_filetime_getDateFromRTC());
 
             if (!fat_directory_addEntry(partition, &dirEntry, dirCluster)) {
                 fat_unlock(&partition->lock);
-                r->_errno = ENOSPC;
+                *error = ENOSPC;
                 return NULL;
             }
 
@@ -265,17 +285,17 @@ fat_file* fat_open_r(
         } else {
             // file doesn't exist, and we aren't creating it
             fat_unlock(&partition->lock);
-            r->_errno = ENOENT;
+            *error = ENOENT;
             return NULL;
         }
     }
 
-    file->filesize = u8array_to_u32(dirEntry.entryData, DIR_ENTRY_fileSize);
+    file->filesize = u8array_to_u32(dirEntry.entryData, fat_dir_entry_fileSize);
 
     /* Allow LARGEFILEs with undefined results
     // Make sure that the file size can fit in the available space
     if (!(flags & O_LARGEFILE) && (file->filesize >= (1<<31))) {
-        r->_errno = EFBIG;
+        *error = EFBIG;
         return -1;
     }
     */
@@ -283,7 +303,7 @@ fat_file* fat_open_r(
     // Make sure we aren't trying to write to a read-only file
     if (file->write && !fat_directory_isWritable(&dirEntry)) {
         fat_unlock(&partition->lock);
-        r->_errno = EROFS;
+        *error = EROFS;
         return NULL;
     }
 
@@ -360,7 +380,7 @@ Returns 0 on success, an error code on failure.
 int32_t fat_syncToDisc(
     fat_file* file
 ) {
-    uint8_t dirEntryData[DIR_ENTRY_DATA_SIZE];
+    uint8_t dirEntryData[fat_dir_entry_DATA_SIZE];
 
     if (!file || !file->inUse) {
         return EBADF;
@@ -372,33 +392,33 @@ int32_t fat_syncToDisc(
             file->partition->cache, dirEntryData,
             fat_fat_clusterToSector(file->partition, file->dirEntryEnd.cluster) +
                 file->dirEntryEnd.sector,
-            file->dirEntryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
+            file->dirEntryEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
         );
 
         // Write new data to the directory entry
         // File size
-        u32_to_u8array(dirEntryData, DIR_ENTRY_fileSize, file->filesize);
+        u32_to_u8array(dirEntryData, fat_dir_entry_fileSize, file->filesize);
 
         // Start cluster
-        u16_to_u8array(dirEntryData, DIR_ENTRY_cluster, (uint16_t) file->startCluster);
-        u16_to_u8array(dirEntryData, DIR_ENTRY_clusterHigh, file->startCluster >> 16);
+        u16_to_u8array(dirEntryData, fat_dir_entry_cluster, (uint16_t) file->startCluster);
+        u16_to_u8array(dirEntryData, fat_dir_entry_clusterHigh, file->startCluster >> 16);
 
         // Modification time and date
-        u16_to_u8array(dirEntryData, DIR_ENTRY_mTime, fat_filetime_getTimeFromRTC());
-        u16_to_u8array(dirEntryData, DIR_ENTRY_mDate, fat_filetime_getDateFromRTC());
+        u16_to_u8array(dirEntryData, fat_dir_entry_mTime, fat_filetime_getTimeFromRTC());
+        u16_to_u8array(dirEntryData, fat_dir_entry_mDate, fat_filetime_getDateFromRTC());
 
         // Access date
-        u16_to_u8array(dirEntryData, DIR_ENTRY_aDate, fat_filetime_getDateFromRTC());
+        u16_to_u8array(dirEntryData, fat_dir_entry_aDate, fat_filetime_getDateFromRTC());
 
         // Set archive attribute
-        dirEntryData[DIR_ENTRY_attributes] |= ATTRIB_ARCH;
+        dirEntryData[fat_dir_entry_attributes] |= ATTRIB_ARCH;
 
         // Write the new entry
         fat_cache_writePartialSector(
             file->partition->cache, dirEntryData,
             fat_fat_clusterToSector(file->partition, file->dirEntryEnd.cluster) +
                 file->dirEntryEnd.sector,
-            file->dirEntryEnd.offset * DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
+            file->dirEntryEnd.offset * fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
         );
 
         // Flush any sectors in the disc cache
@@ -412,14 +432,14 @@ int32_t fat_syncToDisc(
     return 0;
 }
 
-int32_t fat_close_r(
-    struct fat_reent* r, void* fd
+int efs_close(
+    int* error, void* fd
 ) {
     fat_file* file = (fat_file*) fd;
     int32_t   ret  = 0;
 
     if (!file->inUse) {
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -428,8 +448,8 @@ int32_t fat_close_r(
     if (file->write) {
         ret = fat_syncToDisc(file);
         if (ret != 0) {
-            r->_errno = ret;
-            ret       = -1;
+            *error = ret;
+            ret    = -1;
         }
     }
 
@@ -446,13 +466,17 @@ int32_t fat_close_r(
         file->partition->firstOpenFile = file->nextOpenFile;
     }
 
+    if (file->allocated) {
+        fat_mem_free(file);
+    }
+
     fat_unlock(&file->partition->lock);
 
     return ret;
 }
 
-int32_t fat_read_r(
-    struct fat_reent* r, void* fd, char* ptr, uint32_t len
+int32_t efs_read(
+    int* error, void* fd, char* ptr, uint32_t len
 ) {
     fat_file*         file = (fat_file*) fd;
     fat_partition*    partition;
@@ -470,7 +494,7 @@ int32_t fat_read_r(
 
     // Make sure we can actually read from the file
     if ((file == NULL) || !file->inUse || !file->read) {
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -479,15 +503,15 @@ int32_t fat_read_r(
 
     // Don't try to read if the read pointer is past the end of file
     if (file->currentPosition >= file->filesize || file->startCluster == CLUSTER_FREE) {
-        r->_errno = EOVERFLOW;
+        *error = EOVERFLOW;
         fat_unlock(&partition->lock);
         return 0;
     }
 
     // Don't read past end of file
     if (len + file->currentPosition > file->filesize) {
-        r->_errno = EOVERFLOW;
-        len       = file->filesize - file->currentPosition;
+        *error = EOVERFLOW;
+        len    = file->filesize - file->currentPosition;
     }
 
     remain   = len;
@@ -530,7 +554,7 @@ int32_t fat_read_r(
                 tempVar, ptr
             )) {
             flagNoError = false;
-            r->_errno   = EIO;
+            *error      = EIO;
         } else {
             ptr += tempVar * partition->bytesPerSector;
             remain -= tempVar * partition->bytesPerSector;
@@ -545,7 +569,7 @@ int32_t fat_read_r(
         if ((remain == 0) && (tempNextCluster == CLUSTER_EOF)) {
             position.sector = partition->sectorsPerCluster;
         } else if (!fat_fat_isValidCluster(partition, tempNextCluster)) {
-            r->_errno   = EIO;
+            *error      = EIO;
             flagNoError = false;
         } else {
             position.sector  = 0;
@@ -575,7 +599,7 @@ int32_t fat_read_r(
                 chunkSize / partition->bytesPerSector, ptr
             )) {
             flagNoError = false;
-            r->_errno   = EIO;
+            *error      = EIO;
             break;
         }
         ptr += chunkSize;
@@ -586,7 +610,7 @@ int32_t fat_read_r(
             position.sector  = partition->sectorsPerCluster;
             position.cluster = chunkEnd;
         } else if (!fat_fat_isValidCluster(partition, nextChunkStart)) {
-            r->_errno   = EIO;
+            *error      = EIO;
             flagNoError = false;
         } else {
             position.sector  = 0;
@@ -601,7 +625,7 @@ int32_t fat_read_r(
                 cache, fat_fat_clusterToSector(partition, position.cluster), tempVar, ptr
             )) {
             flagNoError = false;
-            r->_errno   = EIO;
+            *error      = EIO;
         } else {
             ptr += tempVar * partition->bytesPerSector;
             remain -= tempVar * partition->bytesPerSector;
@@ -636,7 +660,7 @@ int32_t fat_read_r(
 // this solves the over-allocation problems when file size is aligned to cluster size
 // return true on succes, false on error
 static bool fat_check_position_for_next_cluster(
-    struct fat_reent* r, fat_file_position* position, fat_partition* partition, uint32_t remain,
+    int* error, fat_file_position* position, fat_partition* partition, uint32_t remain,
     bool* flagNoError
 ) {
     uint32_t tempNextCluster;
@@ -649,7 +673,7 @@ static bool fat_check_position_for_next_cluster(
     }
     if (position->sector > partition->sectorsPerCluster) {
         // invalid arguments - internal error
-        r->_errno = EINVAL;
+        *error = EINVAL;
         goto err;
     }
     if (position->sector == partition->sectorsPerCluster) {
@@ -661,7 +685,7 @@ static bool fat_check_position_for_next_cluster(
         }
         if (!fat_fat_isValidCluster(partition, tempNextCluster)) {
             // Couldn't get a cluster, so abort
-            r->_errno = ENOSPC;
+            *error = ENOSPC;
             goto err;
         }
         position->sector  = 0;
@@ -679,7 +703,7 @@ err:
 Extend a file so that the size is the same as the rwPosition
 */
 static bool fat_file_extend_r(
-    struct fat_reent* r, fat_file* file
+    int* error, fat_file* file
 ) {
     fat_partition*    partition = file->partition;
     fat_cache*        cache     = file->partition->cache;
@@ -703,7 +727,7 @@ static bool fat_file_extend_r(
         tempNextCluster = fat_fat_linkFreeCluster(partition, position.cluster);
         if (!fat_fat_isValidCluster(partition, tempNextCluster)) {
             // Couldn't get a cluster, so abort
-            r->_errno = ENOSPC;
+            *error = ENOSPC;
             return false;
         }
         position.cluster = tempNextCluster;
@@ -737,7 +761,7 @@ static bool fat_file_extend_r(
                 tempNextCluster = fat_fat_linkFreeCluster(partition, position.cluster);
                 if (!fat_fat_isValidCluster(partition, tempNextCluster)) {
                     // Couldn't get a cluster, so abort
-                    r->_errno = ENOSPC;
+                    *error = ENOSPC;
                     return false;
                 }
                 position.cluster = tempNextCluster;
@@ -750,7 +774,7 @@ static bool fat_file_extend_r(
             position.sector++;
         }
 
-        if (!fat_check_position_for_next_cluster(r, &position, partition, remain, NULL)) {
+        if (!fat_check_position_for_next_cluster(error, &position, partition, remain, NULL)) {
             // error already marked
             return false;
         }
@@ -769,8 +793,8 @@ static bool fat_file_extend_r(
     return true;
 }
 
-int32_t fat_write_r(
-    struct fat_reent* r, void* fd, const char* ptr, uint32_t len
+int32_t efs_write(
+    int* error, void* fd, const char* ptr, uint32_t len
 ) {
     fat_file*         file = (fat_file*) fd;
     fat_partition*    partition;
@@ -784,7 +808,7 @@ int32_t fat_write_r(
 
     // Make sure we can actually write to the file
     if ((file == NULL) || !file->inUse || !file->write) {
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -811,7 +835,7 @@ int32_t fat_write_r(
         if (!fat_fat_isValidCluster(partition, tempNextCluster)) {
             // Couldn't get a cluster, so abort immediately
             fat_unlock(&partition->lock);
-            r->_errno = ENOSPC;
+            *error = ENOSPC;
             return -1;
         }
         file->startCluster           = tempNextCluster;
@@ -832,7 +856,7 @@ int32_t fat_write_r(
     } else {
         // If the write pointer is past the end of the file, extend the file to that size
         if (file->currentPosition > file->filesize) {
-            if (!fat_file_extend_r(r, file)) {
+            if (!fat_file_extend_r(error, file)) {
                 fat_unlock(&partition->lock);
                 return -1;
             }
@@ -848,7 +872,7 @@ int32_t fat_write_r(
     }
 
     // Move onto next cluster if needed
-    fat_check_position_for_next_cluster(r, &position, partition, remain, &flagNoError);
+    fat_check_position_for_next_cluster(error, &position, partition, remain, &flagNoError);
 
     // Align to sector
     tempVar = partition->bytesPerSector - position.byte;
@@ -888,7 +912,7 @@ int32_t fat_write_r(
                 tempVar, ptr
             )) {
             flagNoError = false;
-            r->_errno   = EIO;
+            *error      = EIO;
         } else {
             ptr += tempVar * partition->bytesPerSector;
             remain -= tempVar * partition->bytesPerSector;
@@ -899,7 +923,7 @@ int32_t fat_write_r(
     // Write whole clusters
     while ((remain >= partition->bytesPerCluster) && flagNoError) {
         // allocate next cluster
-        fat_check_position_for_next_cluster(r, &position, partition, remain, &flagNoError);
+        fat_check_position_for_next_cluster(error, &position, partition, remain, &flagNoError);
         if (!flagNoError) {
             break;
         }
@@ -920,7 +944,7 @@ int32_t fat_write_r(
             next_position.sector = partition->sectorsPerCluster;
             // get or allocate next cluster
             fat_check_position_for_next_cluster(
-                r, &next_position, partition, remain - chunkSize, &flagNoError
+                error, &next_position, partition, remain - chunkSize, &flagNoError
             );
             if (!flagNoError) {
                 break; // exit loop on error
@@ -938,7 +962,7 @@ int32_t fat_write_r(
                 chunkSize / partition->bytesPerSector, ptr
             )) {
             flagNoError = false;
-            r->_errno   = EIO;
+            *error      = EIO;
             break;
         }
         ptr += chunkSize;
@@ -956,7 +980,7 @@ int32_t fat_write_r(
     }
 
     // allocate next cluster if needed
-    fat_check_position_for_next_cluster(r, &position, partition, remain, &flagNoError);
+    fat_check_position_for_next_cluster(error, &position, partition, remain, &flagNoError);
 
     // Write remaining sectors
     tempVar = remain / partition->bytesPerSector; // Number of sectors left
@@ -965,7 +989,7 @@ int32_t fat_write_r(
                 cache, fat_fat_clusterToSector(partition, position.cluster), tempVar, ptr
             )) {
             flagNoError = false;
-            r->_errno   = EIO;
+            *error      = EIO;
         } else {
             ptr += tempVar * partition->bytesPerSector;
             remain -= tempVar * partition->bytesPerSector;
@@ -1012,19 +1036,19 @@ int32_t fat_write_r(
     return len;
 }
 
-fat_off_t fat_seek_r(
-    struct fat_reent* r, void* fd, fat_off_t pos, int32_t dir
+uint32_t efs_seek(
+    int* error, void* fd, uint32_t pos, int32_t dir
 ) {
     fat_file*      file = (fat_file*) fd;
     fat_partition* partition;
     uint32_t       cluster, nextCluster;
     int32_t        clusCount;
-    fat_off_t      newPosition;
+    uint32_t       newPosition;
     uint32_t       position;
 
     if ((file == NULL) || (file->inUse == false)) {
         // invalid file
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -1036,14 +1060,14 @@ fat_off_t fat_seek_r(
         newPosition = pos;
         break;
     case SEEK_CUR:
-        newPosition = (fat_off_t) file->currentPosition + pos;
+        newPosition = (uint32_t) file->currentPosition + pos;
         break;
     case SEEK_END:
-        newPosition = (fat_off_t) file->filesize + pos;
+        newPosition = (uint32_t) file->filesize + pos;
         break;
     default:
         fat_unlock(&partition->lock);
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
@@ -1087,7 +1111,7 @@ fat_off_t fat_seek_r(
                 file->rwPosition.byte   = 0;
             } else {
                 fat_unlock(&partition->lock);
-                r->_errno = EINVAL;
+                *error = EINVAL;
                 return -1;
             }
         }
@@ -1102,16 +1126,16 @@ fat_off_t fat_seek_r(
     return position;
 }
 
-int32_t fat_fstat_r(
-    struct fat_reent* r, void* fd, struct fat_stat* st
+int efs_fstat(
+    int* error, void* fd, struct fat_stat* st
 ) {
     fat_file*      file = (fat_file*) fd;
     fat_partition* partition;
-    DIR_ENTRY      fileEntry;
+    fat_dir_entry  fileEntry;
 
     if ((file == NULL) || (file->inUse == false)) {
         // invalid file
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -1124,7 +1148,7 @@ int32_t fat_fstat_r(
 
     if (!fat_directory_entryFromPosition(partition, &fileEntry)) {
         fat_unlock(&partition->lock);
-        r->_errno = EIO;
+        *error = EIO;
         return -1;
     }
 
@@ -1139,8 +1163,8 @@ int32_t fat_fstat_r(
     return 0;
 }
 
-int32_t fat_ftruncate_r(
-    struct fat_reent* r, void* fd, fat_off_t len
+int efs_ftruncate(
+    int* error, void* fd, uint32_t len
 ) {
     fat_file*      file = (fat_file*) fd;
     fat_partition* partition;
@@ -1149,13 +1173,13 @@ int32_t fat_ftruncate_r(
 
     if (!file || !file->inUse) {
         // invalid file
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
     if (!file->write) {
         // Read-only file
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
@@ -1172,7 +1196,7 @@ int32_t fat_ftruncate_r(
             if (!fat_fat_isValidCluster(partition, tempNextCluster)) {
                 // Couldn't get a cluster, so abort immediately
                 fat_unlock(&partition->lock);
-                r->_errno = ENOSPC;
+                *error = ENOSPC;
                 return -1;
             }
             file->startCluster       = tempNextCluster;
@@ -1187,7 +1211,7 @@ int32_t fat_ftruncate_r(
         // Set the position to the new size
         file->currentPosition = newSize;
         // Extend the file to the new position
-        if (!fat_file_extend_r(r, file)) {
+        if (!fat_file_extend_r(error, file)) {
             ret = -1;
         }
         // Set the append position to the new rwPointer
@@ -1242,14 +1266,14 @@ int32_t fat_ftruncate_r(
     return ret;
 }
 
-int32_t fat_fsync_r(
-    struct fat_reent* r, void* fd
+int efs_fsync(
+    int* error, void* fd
 ) {
     fat_file* file = (fat_file*) fd;
     int32_t   ret  = 0;
 
     if (!file->inUse) {
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -1257,8 +1281,8 @@ int32_t fat_fsync_r(
 
     ret = fat_syncToDisc(file);
     if (ret != 0) {
-        r->_errno = ret;
-        ret       = -1;
+        *error = ret;
+        ret    = -1;
     }
 
     fat_unlock(&file->partition->lock);

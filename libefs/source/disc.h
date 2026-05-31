@@ -30,6 +30,7 @@
 #pragma once
 
 #include "common.h"
+#include "efs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,15 +38,10 @@ extern "C" {
 
 typedef struct fat_disc fat_disc;
 
-enum fat_efs_type {
-    fat_efs_type_efa,
-    fat_efs_type_efb,
-};
-
 /*
 Create an EFS disc with the type
 */
-fat_disc* fat_efs_disc_create(const char* path, enum fat_efs_type type);
+fat_disc* fat_efs_disc_create(const char* path, enum efs_type type);
 
 /*
 Destroy an EFS disc created with fat_efs_create

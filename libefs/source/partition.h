@@ -119,7 +119,7 @@ void fat_partition_writeFSinfo(fat_partition* partition);
 /*
 Create a partition and disc for the specified EFS type.
 */
-fat_partition* fat_efs_partition_create(const char* path, enum fat_efs_type type);
+fat_partition* fat_efs_partition_create(const char* path, enum efs_type type);
 
 #ifdef __cplusplus
 } // extern "C"

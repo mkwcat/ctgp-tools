@@ -41,16 +41,16 @@
 #include <errno.h>
 #include <string.h>
 
-int fat_stat_r(
-    struct fat_reent* r, const char* path, struct fat_stat* st
+int efs_stat(
+    int* error, const char* path, struct fat_stat* st
 ) {
     fat_partition* partition = NULL;
-    DIR_ENTRY      dirEntry;
+    fat_dir_entry  dirEntry;
 
     // Get the partition this file is on
     partition = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return -1;
     }
 
@@ -59,7 +59,7 @@ int fat_stat_r(
         path = strchr(path, ':') + 1;
     }
     if (strchr(path, ':') != NULL) {
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
@@ -68,7 +68,7 @@ int fat_stat_r(
     // Search for the file on the disc
     if (!fat_directory_entryFromPath(partition, &dirEntry, path, NULL)) {
         fat_unlock(&partition->lock);
-        r->_errno = ENOENT;
+        *error = ENOENT;
         return -1;
     }
 
@@ -79,22 +79,22 @@ int fat_stat_r(
     return 0;
 }
 
-int fat_link_r(
-    struct fat_reent* r, const char* existing, const char* newLink
+int efs_link(
+    int* error, const char* existing, const char* newLink
 ) {
     (void) existing;
     (void) newLink;
 
-    r->_errno = ENOTSUP;
+    *error = ENOTSUP;
     return -1;
 }
 
 static int fat_unlinkCommon(
-    struct fat_reent* r, const char* path, bool isRmDir
+    int* error, const char* path, bool isRmDir
 ) {
     fat_partition* partition = NULL;
-    DIR_ENTRY      dirEntry;
-    DIR_ENTRY      dirContents;
+    fat_dir_entry  dirEntry;
+    fat_dir_entry  dirContents;
     uint32_t       cluster;
     bool           nextEntry;
     bool           errorOccured = false;
@@ -102,13 +102,13 @@ static int fat_unlinkCommon(
     // Get the partition this directory is on
     partition                   = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return -1;
     }
 
     // Make sure we aren't trying to write to a read-only disc
     if (partition->readOnly) {
-        r->_errno = EROFS;
+        *error = EROFS;
         return -1;
     }
 
@@ -117,7 +117,7 @@ static int fat_unlinkCommon(
         path = strchr(path, ':') + 1;
     }
     if (strchr(path, ':') != NULL) {
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
@@ -126,7 +126,7 @@ static int fat_unlinkCommon(
     // Search for the file on the disc
     if (!fat_directory_entryFromPath(partition, &dirEntry, path, NULL)) {
         fat_unlock(&partition->lock);
-        r->_errno = ENOENT;
+        *error = ENOENT;
         return -1;
     }
 
@@ -136,7 +136,7 @@ static int fat_unlinkCommon(
     if (fat_directory_isDirectory(&dirEntry)) {
         if (!isRmDir) {
             fat_unlock(&partition->lock);
-            r->_errno = EISDIR;
+            *error = EISDIR;
             return -1;
         }
 
@@ -146,34 +146,34 @@ static int fat_unlinkCommon(
             if (!fat_directory_isDot(&dirContents)) {
                 // The directory had something in it that isn't a reference to itself or it's parent
                 fat_unlock(&partition->lock);
-                r->_errno = ENOTEMPTY;
+                *error = ENOTEMPTY;
                 return -1;
             }
             nextEntry = fat_directory_getNextEntry(partition, &dirContents);
         }
     } else if (isRmDir) {
         fat_unlock(&partition->lock);
-        r->_errno = ENOTDIR;
+        *error = ENOTDIR;
         return -1;
     }
 
     if (fat_fat_isValidCluster(partition, cluster)) {
         // Remove the cluster chain for this file
         if (!fat_fat_clearLinks(partition, cluster)) {
-            r->_errno    = EIO;
+            *error       = EIO;
             errorOccured = true;
         }
     }
 
     // Remove the directory entry for this file
     if (!fat_directory_removeEntry(partition, &dirEntry)) {
-        r->_errno    = EIO;
+        *error       = EIO;
         errorOccured = true;
     }
 
     // Flush any sectors in the disc cache
     if (!fat_cache_flush(partition->cache)) {
-        r->_errno    = EIO;
+        *error       = EIO;
         errorOccured = true;
     }
 
@@ -185,21 +185,21 @@ static int fat_unlinkCommon(
     }
 }
 
-int fat_unlink_r(
-    struct fat_reent* r, const char* path
+int efs_unlink(
+    int* error, const char* path
 ) {
-    return fat_unlinkCommon(r, path, false);
+    return fat_unlinkCommon(error, path, false);
 }
 
-int fat_chdir_r(
-    struct fat_reent* r, const char* path
+int efs_chdir(
+    int* error, const char* path
 ) {
     fat_partition* partition = NULL;
 
     // Get the partition this directory is on
     partition                = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return -1;
     }
 
@@ -208,7 +208,7 @@ int fat_chdir_r(
         path = strchr(path, ':') + 1;
     }
     if (strchr(path, ':') != NULL) {
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
@@ -222,24 +222,24 @@ int fat_chdir_r(
     } else {
         // Failed
         fat_unlock(&partition->lock);
-        r->_errno = ENOTDIR;
+        *error = ENOTDIR;
         return -1;
     }
 }
 
-int fat_rename_r(
-    struct fat_reent* r, const char* oldName, const char* newName
+int efs_rename(
+    int* error, const char* oldName, const char* newName
 ) {
     fat_partition* partition = NULL;
-    DIR_ENTRY      oldDirEntry;
-    DIR_ENTRY      newDirEntry;
+    fat_dir_entry  oldDirEntry;
+    fat_dir_entry  newDirEntry;
     const char*    pathEnd;
     uint32_t       dirCluster;
 
     // Get the partition this directory is on
     partition = fat_partition_getPartitionFromPath(oldName);
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return -1;
     }
 
@@ -248,14 +248,14 @@ int fat_rename_r(
     // Make sure the same partition is used for the old and new names
     if (partition != fat_partition_getPartitionFromPath(newName)) {
         fat_unlock(&partition->lock);
-        r->_errno = EXDEV;
+        *error = EXDEV;
         return -1;
     }
 
     // Make sure we aren't trying to write to a read-only disc
     if (partition->readOnly) {
         fat_unlock(&partition->lock);
-        r->_errno = EROFS;
+        *error = EROFS;
         return -1;
     }
 
@@ -265,7 +265,7 @@ int fat_rename_r(
     }
     if (strchr(oldName, ':') != NULL) {
         fat_unlock(&partition->lock);
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
     if (strchr(newName, ':') != NULL) {
@@ -273,21 +273,21 @@ int fat_rename_r(
     }
     if (strchr(newName, ':') != NULL) {
         fat_unlock(&partition->lock);
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
     // Search for the file on the disc
     if (!fat_directory_entryFromPath(partition, &oldDirEntry, oldName, NULL)) {
         fat_unlock(&partition->lock);
-        r->_errno = ENOENT;
+        *error = ENOENT;
         return -1;
     }
 
     // Make sure there is no existing file / directory with the new name
     if (fat_directory_entryFromPath(partition, &newDirEntry, newName, NULL)) {
         fat_unlock(&partition->lock);
-        r->_errno = EEXIST;
+        *error = EEXIST;
         return -1;
     }
 
@@ -304,7 +304,7 @@ int fat_rename_r(
         if (!fat_directory_entryFromPath(partition, &newDirEntry, newName, pathEnd) ||
             !fat_directory_isDirectory(&newDirEntry)) {
             fat_unlock(&partition->lock);
-            r->_errno = ENOTDIR;
+            *error = ENOTDIR;
             return -1;
         }
         dirCluster = fat_directory_entryGetCluster(partition, newDirEntry.entryData);
@@ -313,7 +313,7 @@ int fat_rename_r(
     }
 
     // Copy the entry data
-    memcpy(&newDirEntry, &oldDirEntry, sizeof(DIR_ENTRY));
+    memcpy(&newDirEntry, &oldDirEntry, sizeof(fat_dir_entry));
 
     // Set the new name
     strncpy(newDirEntry.filename, pathEnd, fat_NAME_MAX - 1);
@@ -321,21 +321,21 @@ int fat_rename_r(
     // Write the new entry
     if (!fat_directory_addEntry(partition, &newDirEntry, dirCluster)) {
         fat_unlock(&partition->lock);
-        r->_errno = ENOSPC;
+        *error = ENOSPC;
         return -1;
     }
 
     // Remove the old entry
     if (!fat_directory_removeEntry(partition, &oldDirEntry)) {
         fat_unlock(&partition->lock);
-        r->_errno = EIO;
+        *error = EIO;
         return -1;
     }
 
     // Flush any sectors in the disc cache
     if (!fat_cache_flush(partition->cache)) {
         fat_unlock(&partition->lock);
-        r->_errno = EIO;
+        *error = EIO;
         return -1;
     }
 
@@ -343,19 +343,19 @@ int fat_rename_r(
     return 0;
 }
 
-int fat_mkdir_r(
-    struct fat_reent* r, const char* path
+int efs_mkdir(
+    int* error, const char* path
 ) {
     fat_partition* partition = NULL;
     bool           fileExists;
-    DIR_ENTRY      dirEntry;
+    fat_dir_entry  dirEntry;
     const char*    pathEnd;
     uint32_t       parentCluster, dirCluster;
-    uint8_t        newEntryData[DIR_ENTRY_DATA_SIZE];
+    uint8_t        newEntryData[fat_dir_entry_DATA_SIZE];
 
     partition = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return -1;
     }
 
@@ -364,7 +364,7 @@ int fat_mkdir_r(
         path = strchr(path, ':') + 1;
     }
     if (strchr(path, ':') != NULL) {
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return -1;
     }
 
@@ -376,14 +376,14 @@ int fat_mkdir_r(
     // Make sure it doesn't exist
     if (fileExists) {
         fat_unlock(&partition->lock);
-        r->_errno = EEXIST;
+        *error = EEXIST;
         return -1;
     }
 
     if (partition->readOnly) {
         // We can't write to a read-only partition
         fat_unlock(&partition->lock);
-        r->_errno = EROFS;
+        *error = EROFS;
         return -1;
     }
 
@@ -399,7 +399,7 @@ int fat_mkdir_r(
         if (!fat_directory_entryFromPath(partition, &dirEntry, path, pathEnd) ||
             !fat_directory_isDirectory(&dirEntry)) {
             fat_unlock(&partition->lock);
-            r->_errno = ENOTDIR;
+            *error = ENOTDIR;
             return -1;
         }
         parentCluster = fat_directory_entryGetCluster(partition, dirEntry.entryData);
@@ -408,49 +408,49 @@ int fat_mkdir_r(
     }
     // Create the entry data
     strncpy(dirEntry.filename, pathEnd, fat_NAME_MAX - 1);
-    memset(dirEntry.entryData, 0, DIR_ENTRY_DATA_SIZE);
+    memset(dirEntry.entryData, 0, fat_dir_entry_DATA_SIZE);
 
     // Set the creation time and date
-    dirEntry.entryData[DIR_ENTRY_cTime_ms] = 0;
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_cTime, fat_filetime_getTimeFromRTC());
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_cDate, fat_filetime_getDateFromRTC());
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_mTime, fat_filetime_getTimeFromRTC());
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_mDate, fat_filetime_getDateFromRTC());
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_aDate, fat_filetime_getDateFromRTC());
+    dirEntry.entryData[fat_dir_entry_cTime_ms] = 0;
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_cTime, fat_filetime_getTimeFromRTC());
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_cDate, fat_filetime_getDateFromRTC());
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_mTime, fat_filetime_getTimeFromRTC());
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_mDate, fat_filetime_getDateFromRTC());
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_aDate, fat_filetime_getDateFromRTC());
 
     // Set the directory attribute
-    dirEntry.entryData[DIR_ENTRY_attributes] = ATTRIB_DIR;
+    dirEntry.entryData[fat_dir_entry_attributes] = ATTRIB_DIR;
 
     // Get a cluster for the new directory
     dirCluster = fat_fat_linkFreeClusterCleared(partition, CLUSTER_FREE);
     if (!fat_fat_isValidCluster(partition, dirCluster)) {
         // No space left on disc for the cluster
         fat_unlock(&partition->lock);
-        r->_errno = ENOSPC;
+        *error = ENOSPC;
         return -1;
     }
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_cluster, (uint16_t) dirCluster);
-    u16_to_u8array(dirEntry.entryData, DIR_ENTRY_clusterHigh, dirCluster >> 16);
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_cluster, (uint16_t) dirCluster);
+    u16_to_u8array(dirEntry.entryData, fat_dir_entry_clusterHigh, dirCluster >> 16);
 
     // Write the new directory's entry to it's parent
     if (!fat_directory_addEntry(partition, &dirEntry, parentCluster)) {
         fat_unlock(&partition->lock);
-        r->_errno = ENOSPC;
+        *error = ENOSPC;
         return -1;
     }
 
     // Create the dot entry within the directory
-    memset(newEntryData, 0, DIR_ENTRY_DATA_SIZE);
+    memset(newEntryData, 0, fat_dir_entry_DATA_SIZE);
     memset(newEntryData, ' ', 11);
-    newEntryData[DIR_ENTRY_name]       = '.';
-    newEntryData[DIR_ENTRY_attributes] = ATTRIB_DIR;
-    u16_to_u8array(newEntryData, DIR_ENTRY_cluster, (uint16_t) dirCluster);
-    u16_to_u8array(newEntryData, DIR_ENTRY_clusterHigh, dirCluster >> 16);
+    newEntryData[fat_dir_entry_name]       = '.';
+    newEntryData[fat_dir_entry_attributes] = ATTRIB_DIR;
+    u16_to_u8array(newEntryData, fat_dir_entry_cluster, (uint16_t) dirCluster);
+    u16_to_u8array(newEntryData, fat_dir_entry_clusterHigh, dirCluster >> 16);
 
     // Write it to the directory, erasing that sector in the process
     fat_cache_eraseWritePartialSector(
         partition->cache, newEntryData, fat_fat_clusterToSector(partition, dirCluster), 0,
-        DIR_ENTRY_DATA_SIZE
+        fat_dir_entry_DATA_SIZE
     );
 
     // Create the double dot entry within the directory
@@ -460,20 +460,20 @@ int fat_mkdir_r(
         parentCluster = FAT16_ROOT_DIR_CLUSTER;
     }
 
-    newEntryData[DIR_ENTRY_name + 1] = '.';
-    u16_to_u8array(newEntryData, DIR_ENTRY_cluster, (uint16_t) parentCluster);
-    u16_to_u8array(newEntryData, DIR_ENTRY_clusterHigh, parentCluster >> 16);
+    newEntryData[fat_dir_entry_name + 1] = '.';
+    u16_to_u8array(newEntryData, fat_dir_entry_cluster, (uint16_t) parentCluster);
+    u16_to_u8array(newEntryData, fat_dir_entry_clusterHigh, parentCluster >> 16);
 
     // Write it to the directory
     fat_cache_writePartialSector(
         partition->cache, newEntryData, fat_fat_clusterToSector(partition, dirCluster),
-        DIR_ENTRY_DATA_SIZE, DIR_ENTRY_DATA_SIZE
+        fat_dir_entry_DATA_SIZE, fat_dir_entry_DATA_SIZE
     );
 
     // Flush any sectors in the disc cache
     if (!fat_cache_flush(partition->cache)) {
         fat_unlock(&partition->lock);
-        r->_errno = EIO;
+        *error = EIO;
         return -1;
     }
 
@@ -481,15 +481,15 @@ int fat_mkdir_r(
     return 0;
 }
 
-int fat_rmdir_r(
-    struct fat_reent* r, const char* path
+int efs_rmdir(
+    int* error, const char* path
 ) {
-    return fat_unlinkCommon(r, path, true);
+    return fat_unlinkCommon(error, path, true);
 }
 
 #if 0
 int fat_statvfs_r(
-    struct fat_reent* r, const char* path, struct statvfs* buf
+    int* error, const char* path, struct statvfs* buf
 ) {
     fat_partition*   partition = NULL;
     unsigned int freeClusterCount;
@@ -497,7 +497,7 @@ int fat_statvfs_r(
     // Get the partition of the requested path
     partition = fat_partition_getPartitionFromPath(path);
     if (partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return -1;
     }
 
@@ -541,16 +541,16 @@ int fat_statvfs_r(
 }
 #endif
 
-fat_dir_iter* fat_diropen_r(
-    struct fat_reent* r, fat_dir_iter* dirState, const char* path
+fat_dir_iter* efs_diropen(
+    int* error, fat_dir_iter* dirState, const char* path
 ) {
-    DIR_ENTRY      dirEntry;
+    fat_dir_entry  dirEntry;
     fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
     bool           fileExists;
 
     state->partition = fat_partition_getPartitionFromPath(path);
     if (state->partition == NULL) {
-        r->_errno = ENODEV;
+        *error = ENODEV;
         return NULL;
     }
 
@@ -559,7 +559,7 @@ fat_dir_iter* fat_diropen_r(
         path = strchr(path, ':') + 1;
     }
     if (strchr(path, ':') != NULL) {
-        r->_errno = EINVAL;
+        *error = EINVAL;
         return NULL;
     }
 
@@ -570,14 +570,14 @@ fat_dir_iter* fat_diropen_r(
 
     if (!fileExists) {
         fat_unlock(&state->partition->lock);
-        r->_errno = ENOENT;
+        *error = ENOENT;
         return NULL;
     }
 
     // Make sure it is a directory
     if (!fat_directory_isDirectory(&dirEntry)) {
         fat_unlock(&state->partition->lock);
-        r->_errno = ENOTDIR;
+        *error = ENOTDIR;
         return NULL;
     }
 
@@ -594,8 +594,8 @@ fat_dir_iter* fat_diropen_r(
     return (fat_dir_iter*) state;
 }
 
-int fat_dirreset_r(
-    struct fat_reent* r, fat_dir_iter* dirState
+int efs_dirreset(
+    int* error, fat_dir_iter* dirState
 ) {
     fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
 
@@ -604,7 +604,7 @@ int fat_dirreset_r(
     // Make sure we are still using this entry
     if (!state->inUse) {
         fat_unlock(&state->partition->lock);
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -616,8 +616,8 @@ int fat_dirreset_r(
     return 0;
 }
 
-int fat_dirnext_r(
-    struct fat_reent* r, fat_dir_iter* dirState, char* filename, struct fat_stat* filestat
+int efs_dirnext(
+    int* error, fat_dir_iter* dirState, char* filename, struct fat_stat* filestat
 ) {
     fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
 
@@ -626,7 +626,7 @@ int fat_dirnext_r(
     // Make sure we are still using this entry
     if (!state->inUse) {
         fat_unlock(&state->partition->lock);
-        r->_errno = EBADF;
+        *error = EBADF;
         return -1;
     }
 
@@ -650,10 +650,10 @@ int fat_dirnext_r(
     return 0;
 }
 
-int fat_dirclose_r(
-    struct fat_reent* r, fat_dir_iter* dirState
+int efs_dirclose(
+    int* error, fat_dir_iter* dirState
 ) {
-    (void) r;
+    (void) error;
 
     fat_dir_state* state = (fat_dir_state*) (dirState->dirStruct);
 

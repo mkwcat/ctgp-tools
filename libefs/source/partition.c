@@ -261,9 +261,10 @@ static fat_partition* fat_partition_constructor_buf(
 
     partition->rootDirStart =
         partition->fat.fatStart + (sectorBuffer[BPB_numFATs] * partition->fat.sectorsPerFat);
-    partition->dataStart = partition->rootDirStart +
-                           ((u8array_to_u16(sectorBuffer, BPB_rootEntries) * DIR_ENTRY_DATA_SIZE) /
-                            partition->bytesPerSector);
+    partition->dataStart =
+        partition->rootDirStart +
+        ((u8array_to_u16(sectorBuffer, BPB_rootEntries) * fat_dir_entry_DATA_SIZE) /
+         partition->bytesPerSector);
 
     partition->totalSize =
         ((uint64_t) partition->numberOfSectors - (partition->dataStart - startSector)) *
@@ -476,7 +477,7 @@ void fat_partition_writeFSinfo(
 }
 
 fat_partition* fat_efs_partition_create(
-    const char* path, enum fat_efs_type type
+    const char* path, enum efs_type type
 ) {
     if (labels[type]) {
         return labels[type];
@@ -488,14 +489,20 @@ fat_partition* fat_efs_partition_create(
            );
 }
 
+bool efs_mount(
+    const char* path, enum efs_type type
+) {
+    return fat_efs_partition_create(path, type);
+}
+
 fat_partition* fat_partition_getPartitionFromPath(
     const char* path
 ) {
     if (strncmp(path, "efa:", 4) == 0) {
-        return labels[fat_efs_type_efa];
+        return labels[efs_type_efa];
     }
     if (strncmp(path, "efb:", 4) == 0) {
-        return labels[fat_efs_type_efb];
+        return labels[efs_type_efb];
     }
     return NULL;
 }

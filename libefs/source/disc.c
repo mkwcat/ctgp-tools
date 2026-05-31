@@ -27,7 +27,7 @@ enum {
 };
 
 fat_disc* fat_efs_disc_create(
-    const char* path, enum fat_efs_type type
+    const char* path, enum efs_type type
 ) {
     (void) type;
 
@@ -114,8 +114,12 @@ bool fat_disc_readSectors(
     }
     disc->sector = sector + numSectors;
 
+#if 0
     printf("sector dump @ %u\n", sector);
     printHex((uint8_t*) buffer, numSectors * SECTOR_SIZE);
+#else
+    (void) printHex;
+#endif
     return true;
 }
 

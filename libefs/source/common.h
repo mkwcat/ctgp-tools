@@ -39,29 +39,7 @@ extern "C" {
 #endif
 
 typedef uint32_t sec_t;
-typedef uint32_t fat_off_t;
 typedef int32_t  fat_ino_t;
-
-typedef struct {
-    int32_t device;
-    void*   dirStruct;
-} fat_dir_iter;
-
-struct fat_stat {
-    int32_t   st_dev;
-    fat_ino_t st_ino;
-    uint32_t  st_size;
-    uint32_t  st_mode;
-    time_t    st_atime;
-    time_t    st_mtime;
-    time_t    st_ctime;
-    int32_t   st_blocks;
-    int32_t   st_blksize;
-};
-
-struct fat_reent {
-    int _errno;
-};
 
 enum {
     fat_S_IFDIR = (1u << 0),

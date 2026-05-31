@@ -30,6 +30,7 @@
 
 #include "common.h"
 #include "directory.h"
+#include "efs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -37,39 +38,15 @@ extern "C" {
 
 typedef struct fat_dir_state {
     fat_partition* partition;
-    DIR_ENTRY      currentEntry;
+    fat_dir_entry  currentEntry;
     uint32_t       startCluster;
     bool           inUse;
     bool           validEntry;
 } fat_dir_state;
 
-extern int fat_stat_r(struct fat_reent* r, const char* path, struct fat_stat* st);
-
-extern int fat_link_r(struct fat_reent* r, const char* existing, const char* newLink);
-
-extern int fat_unlink_r(struct fat_reent* r, const char* name);
-
-extern int fat_chdir_r(struct fat_reent* r, const char* name);
-
-extern int fat_rename_r(struct fat_reent* r, const char* oldName, const char* newName);
-
-extern int fat_mkdir_r(struct fat_reent* r, const char* path);
-
-extern int fat_rmdir_r(struct fat_reent* r, const char* path);
-
 #if 0
-extern int fat_statvfs_r(struct fat_reent* r, const char* path, struct statvfs* buf);
+extern int fat_statvfs_r(int* error, const char* path, struct statvfs* buf);
 #endif
-
-/*
-Directory iterator functions
-*/
-extern fat_dir_iter* fat_diropen_r(struct fat_reent* r, fat_dir_iter* dirState, const char* path);
-extern int fat_dirreset_r(struct fat_reent* r, fat_dir_iter* dirState);
-extern int fat_dirnext_r(
-    struct fat_reent* r, fat_dir_iter* dirState, char* filename, struct fat_stat* filestat
-);
-extern int fat_dirclose_r(struct fat_reent* r, fat_dir_iter* dirState);
 
 #ifdef __cplusplus
 } // extern "C"

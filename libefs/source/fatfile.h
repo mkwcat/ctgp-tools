@@ -32,6 +32,7 @@
 
 #include "common.h"
 #include "directory.h"
+#include "efs.h"
 #include "partition.h"
 
 #ifdef __cplusplus
@@ -52,46 +53,19 @@ typedef struct fat_file {
     uint32_t          currentPosition;
     fat_file_position rwPosition;
     fat_file_position appendPosition;
-    DIR_ENTRY_POSITION
-    dirEntryStart; // Points to the start of the LFN entries of a file, or the alias for no LFN
-    DIR_ENTRY_POSITION dirEntryEnd; // Always points to the file's alias entry
-    fat_partition*     partition;
-    struct fat_file*   prevOpenFile; // The previous entry in a double-linked list of open files
-    struct fat_file*   nextOpenFile; // The next entry in a double-linked list of open files
-    bool               read;
-    bool               write;
-    bool               append;
-    bool               inUse;
-    bool               modified;
+    fat_dir_entry_position
+        dirEntryStart; // Points to the start of the LFN entries of a file, or the alias for no LFN
+    fat_dir_entry_position dirEntryEnd; // Always points to the file's alias entry
+    fat_partition*         partition;
+    struct fat_file*       prevOpenFile; // The previous entry in a double-linked list of open files
+    struct fat_file*       nextOpenFile; // The next entry in a double-linked list of open files
+    bool                   read;
+    bool                   write;
+    bool                   append;
+    bool                   inUse;
+    bool                   modified;
+    bool                   allocated;
 } fat_file;
-
-fat_file* fat_open_r(struct fat_reent* r, fat_file* fileStruct, const char* path, int32_t flags);
-
-int32_t fat_close_r(struct fat_reent* r, void* fd);
-
-int32_t fat_write_r(struct fat_reent* r, void* fd, const char* ptr, uint32_t len);
-
-int32_t fat_read_r(struct fat_reent* r, void* fd, char* ptr, uint32_t len);
-
-fat_off_t fat_seek_r(struct fat_reent* r, void* fd, fat_off_t pos, int32_t dir);
-
-int32_t fat_fstat_r(struct fat_reent* r, void* fd, struct fat_stat* st);
-
-int32_t fat_stat_r(struct fat_reent* r, const char* path, struct fat_stat* st);
-
-int32_t fat_link_r(struct fat_reent* r, const char* existing, const char* newLink);
-
-int32_t fat_chdir_r(struct fat_reent* r, const char* name);
-
-int32_t fat_rename_r(struct fat_reent* r, const char* oldName, const char* newName);
-
-int32_t fat_ftruncate_r(struct fat_reent* r, void* fd, fat_off_t len);
-
-int32_t fat_fsync_r(struct fat_reent* r, void* fd);
-
-int32_t fat_getAttr(const char* file);
-
-int32_t fat_setAttr(const char* file, uint8_t attr);
 
 /*
 Synchronizes the file data to disc.
