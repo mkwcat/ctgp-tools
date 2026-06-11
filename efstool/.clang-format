@@ -1,0 +1,85 @@
+Language: Cpp
+AccessModifierOffset: -4
+AlignAfterOpenBracket: BlockIndent
+AlignConsecutiveAssignments:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+  AlignFunctionDeclarations: false
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+AllowShortFunctionsOnASingleLine: InlineOnly
+AttributeMacros:
+BasedOnStyle: LLVM
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterCaseLabel: false
+  AfterClass: true
+  AfterControlStatement: Never
+  AfterEnum: false
+  AfterExternBlock: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterObjCDeclaration: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  BeforeLambdaBody: false
+  BeforeWhile: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+BreakAfterAttributes: Always
+BreakConstructorInitializers: BeforeComma
+BreakFunctionDefinitionParameters: true
+ColumnLimit: 100
+CommentPragmas: ''
+EnumTrailingComma: Insert
+FixNamespaceComments: true
+ForEachMacros:
+IfMacros: [KEY]
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '.*'
+    Priority: 1
+    SortPriority: 0
+    CaseSensitive: true
+IncludeIsMainRegex: ''
+IncludeIsMainSourceRegex: ''
+IndentExternBlock: NoIndent
+IndentPPDirectives: AfterHash
+IndentWidth: 4
+InsertBraces: true
+InsertNewlineAtEOF: true
+KeepEmptyLines:
+  AtEndOfFile: false
+  AtStartOfBlock: false
+  AtStartOfFile: false
+LineEnding: LF
+MacroBlockBegin: ''
+MacroBlockEnd: ''
+MaxEmptyLinesToKeep: 1
+PackConstructorInitializers: Never
+PointerAlignment: Left
+PPIndentWidth: 2
+SeparateDefinitionBlocks: Always
+SpaceAfterCStyleCast: true
+Standard: Latest
+StatementAttributeLikeMacros:
+StatementMacros:
+TabWidth: 4
+WhitespaceSensitiveMacros:
+  - ASM
+  - ASM_METHOD

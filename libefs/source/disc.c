@@ -10,7 +10,7 @@ struct fat_disc {
     FILE*          file;
     struct AES_ctx aes;
     sec_t          sector;
-    size_t         size;
+    uint64_t       size;
 };
 
 static const uint8_t BlobKey[16] = {
@@ -27,7 +27,9 @@ enum {
     BLOCK_SIZE     = (SECTOR_SIZE * BLOCK_SIZE_SEC),
 };
 
-#define ENSURE(x) if(!(x)) return false;
+#define ENSURE(x)                                                                                  \
+    if (!(x))                                                                                      \
+    return false
 
 fat_disc* fat_efs_disc_create(
     const char* path, enum efs_type type
@@ -48,11 +50,11 @@ fat_disc* fat_efs_disc_create(
     disc->file   = fp;
     disc->sector = 0;
     AES_init_ctx(&disc->aes, BlobKey);
-    
+
     ENSURE(fseek(fp, 0, SEEK_END) == 0);
     disc->size = ftell(fp);
     ENSURE(fseek(fp, 0, SEEK_SET) == 0);
-    
+
     return disc;
 }
 
@@ -132,29 +134,32 @@ bool fat_disc_readSectors(
     return true;
 }
 
-// Extends a fat disc to at least the new required size, ensuring a whole number of pages 
-bool fat_disc_extend(
+// Extends a fat disc to at least the new required size, ensuring a whole number of pages
+static bool fat_disc_extend(
     fat_disc* disc, long minNewSize
 ) {
     printf("Tried to extend disc\n"); // numberOfSectors endOfPartition cache stuff
     return true;
-    long numNewPages = (minNewSize - disc->size) / BLOCK_SIZE + 1;
-    void* newPages = calloc(numNewPages, BLOCK_SIZE);
+#if 0
+    // TODO: if this is ever used, please free this buffer being allocated
+    long  numNewPages = (minNewSize - disc->size) / BLOCK_SIZE + 1;
+    void* newPages    = calloc(numNewPages, BLOCK_SIZE);
 
-    long oldpos = ftell(disc->file);
+    long  oldpos      = ftell(disc->file);
     ENSURE(fseek(disc->file, 0, SEEK_END) == 0);
     ENSURE(fwrite(newPages, numNewPages * BLOCK_SIZE, 1, disc->file) == 0);
     ENSURE(fseek(disc->file, oldpos, SEEK_SET) == 0);
 
     return true;
+#endif
 }
 
 bool fat_disc_writeSectors(
     fat_disc* disc, sec_t sector, sec_t numSectors, const void* buffer
 ) {
-    uint8_t iv[16];
+    uint8_t  iv[16];
 
-    long maxOffset = (sector + numSectors) * SECTOR_SIZE;
+    uint64_t maxOffset = (sector + numSectors) * SECTOR_SIZE;
     if (maxOffset >= disc->size) {
         ENSURE(fat_disc_extend(disc, maxOffset));
     }
@@ -169,14 +174,15 @@ bool fat_disc_writeSectors(
         AES_ctx_set_iv(&disc->aes, iv);
     }
 
+    uint8_t sector_buffer[SECTOR_SIZE];
     for (sec_t i = 0; i < numSectors; i++) {
         if (((sector + i) % BLOCK_SIZE_SEC) == 0) {
             AES_ctx_set_iv(&disc->aes, blobEncodeIv(sector + i, iv));
         }
-        AES_CBC_encrypt_buffer(&disc->aes, (uint8_t*)buffer + i * SECTOR_SIZE, SECTOR_SIZE);
+        memcpy(sector_buffer, (const uint8_t*) buffer + i * SECTOR_SIZE, SECTOR_SIZE);
+        AES_CBC_encrypt_buffer(&disc->aes, sector_buffer, SECTOR_SIZE);
+        ENSURE(fwrite(sector_buffer, SECTOR_SIZE, 1, disc->file) == 1);
     }
-    
-    ENSURE(fwrite(buffer, numSectors * SECTOR_SIZE, 1, disc->file) == 1);
     disc->sector += numSectors;
 
     return true;

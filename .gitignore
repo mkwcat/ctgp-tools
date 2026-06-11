@@ -1,6 +1,11 @@
 .vscode/
 .DS_Store
+*.dSYM/
+efstool/*.exe
+efstool/*.out
+efstool/*.elf
 libefs/*.exe
 libefs/*.out
 libefs/*.elf
 blob.bin
+jelly.bin

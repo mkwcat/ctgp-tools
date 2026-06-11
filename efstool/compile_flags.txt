@@ -1,0 +1,7 @@
+-std=c99
+-Weverything
+-Wno-sign-conversion
+-Wno-covered-switch-default
+-Wno-declaration-after-statement
+-Wno-poison-system-directories
+-Iinclude

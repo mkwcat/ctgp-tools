@@ -1,10 +1,14 @@
 #include "efs.h"
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 
-bool make_new_file(const char* path, uint8_t* data, size_t size) {
-    int error;
+#ifdef LIBEFS_MAIN
+
+bool make_new_file(
+    const char* path, uint8_t* data, size_t size
+) {
+    int   error;
     void* fp = efs_open(&error, path, O_CREAT | O_WRONLY);
     if (!fp) {
         printf("create new file [%s] failed, error: %d\n", path, error);
@@ -59,15 +63,26 @@ int main(
     printf("%s\n", magic);
     printf("packages.bin size: 0x%X\n", (unsigned int) stats.st_size);
 
-    uint8_t data[] = {0x4a, 0x50, 0x35, 0x35, 0x03, 0x04, 0x00, 0x04, 0x08, 0x29, 0x20, 0x03, 0x00, 0x00, 0x00, 0x10};
+    uint8_t data[] = {0x4a, 0x50, 0x35, 0x35, 0x03, 0x04, 0x00, 0x04,
+                      0x08, 0x29, 0x20, 0x03, 0x00, 0x00, 0x00, 0x10};
 
-    //if (!make_new_file("efa:/johnp55.bin", data)) return EXIT_FAILURE;
-    //efs_unlink(&error, "efa:/johnp55longerwhufioewrhguieowr.bin");
-    if (!make_new_file("efa:/johnp55longerwhufioewrhguieowr.bin", data, sizeof(data))) return EXIT_FAILURE;
-    if (!make_new_file("efa:/johnp55longerwhufioewrhgumeowr.bin", data, sizeof(data))) return EXIT_FAILURE; // todo: figure out why this doesn't get made
-    if (!make_new_file("efa:/johnp56.bin", data, sizeof(data))) return EXIT_FAILURE;
-    if (!make_new_file("efa:/JOHNP57.BIN", data, sizeof(data))) return EXIT_FAILURE; // todo: figure out why this doesn't get made
-    if (!make_new_file("efa:/JOHNP58.BIN", data, sizeof(data))) return EXIT_FAILURE;
+    // if (!make_new_file("efa:/johnp55.bin", data)) return EXIT_FAILURE;
+    // efs_unlink(&error, "efa:/johnp55longerwhufioewrhguieowr.bin");
+    if (!make_new_file("efa:/johnp55longerwhufioewrhguieowr.bin", data, sizeof(data))) {
+        return EXIT_FAILURE;
+    }
+    if (!make_new_file("efa:/johnp55longerwhufioewrhgumeowr.bin", data, sizeof(data))) {
+        return EXIT_FAILURE; // todo: figure out why this doesn't get made
+    }
+    if (!make_new_file("efa:/johnp56.bin", data, sizeof(data))) {
+        return EXIT_FAILURE;
+    }
+    if (!make_new_file("efa:/JOHNP57.BIN", data, sizeof(data))) {
+        return EXIT_FAILURE; // todo: figure out why this doesn't get made
+    }
+    if (!make_new_file("efa:/JOHNP58.BIN", data, sizeof(data))) {
+        return EXIT_FAILURE;
+    }
 
     if (efs_close(&error, fp) != 0) {
         printf("close packages.bin failed, error: %d\n", error);
@@ -79,3 +94,5 @@ int main(
         return EXIT_FAILURE;
     }
 }
+
+#endif
