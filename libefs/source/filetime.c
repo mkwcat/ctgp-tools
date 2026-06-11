@@ -46,7 +46,7 @@ static struct tm* fat_localtime_r(
     if (localtime_s(result, timer) == 0) {
         return result;
     }
-    return nullptr;
+    return NULL;
 #else
     return localtime_r(timer, result);
 #endif

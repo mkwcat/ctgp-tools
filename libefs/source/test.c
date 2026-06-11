@@ -6,7 +6,7 @@
 #ifdef LIBEFS_MAIN
 
 bool make_new_file(
-    const char* path, uint8_t* data, size_t size
+    const char* path, uint8_t* data, uint32_t size
 ) {
     int   error;
     void* fp = efs_open(&error, path, O_CREAT | O_WRONLY);
@@ -72,15 +72,24 @@ int main(
         return EXIT_FAILURE;
     }
     if (!make_new_file("efa:/johnp55longerwhufioewrhgumeowr.bin", data, sizeof(data))) {
-        return EXIT_FAILURE; // todo: figure out why this doesn't get made
+        return EXIT_FAILURE;
     }
     if (!make_new_file("efa:/johnp56.bin", data, sizeof(data))) {
         return EXIT_FAILURE;
     }
     if (!make_new_file("efa:/JOHNP57.BIN", data, sizeof(data))) {
-        return EXIT_FAILURE; // todo: figure out why this doesn't get made
+        return EXIT_FAILURE;
     }
     if (!make_new_file("efa:/JOHNP58.BIN", data, sizeof(data))) {
+        return EXIT_FAILURE;
+    }
+    if (!make_new_file("efa:/JOHNP555.BIN", data, sizeof(data))) {
+        return EXIT_FAILURE;
+    }
+    if (!make_new_file("efa:/JOHNP556.BIN", data, sizeof(data))) {
+        return EXIT_FAILURE;
+    }
+    if (!make_new_file("efa:/JOHNP557.BIN", data, sizeof(data))) {
         return EXIT_FAILURE;
     }
 

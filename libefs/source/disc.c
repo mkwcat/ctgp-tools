@@ -139,7 +139,7 @@ static bool fat_disc_extend(
     fat_disc* disc, long minNewSize
 ) {
     printf("Tried to extend disc\n"); // numberOfSectors endOfPartition cache stuff
-    return true;
+    return false;
 #if 0
     // TODO: if this is ever used, please free this buffer being allocated
     long  numNewPages = (minNewSize - disc->size) / BLOCK_SIZE + 1;
@@ -183,7 +183,7 @@ bool fat_disc_writeSectors(
         AES_CBC_encrypt_buffer(&disc->aes, sector_buffer, SECTOR_SIZE);
         ENSURE(fwrite(sector_buffer, SECTOR_SIZE, 1, disc->file) == 1);
     }
-    disc->sector += numSectors;
+    disc->sector = sector + numSectors;
 
     return true;
 }
